@@ -146,12 +146,24 @@ get_cart
 
 ## Tool-Specific Implementation Notes
 
-Tool sections below are the implementation gate. If a section lacks the template fields from “Required Per-Tool Template,” the coding agent must complete it from the live Swiggy page before changing code for that tool.
+Tool sections below are the implementation gate. A Swiggy tool may be implemented or modified only after its section uses the required template and has been checked against the live tool page.
 
 ### `create_address`
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/create_address/
 - Last checked: 2026-05-01.
+- Tool name: `create_address`.
+- MCP server: Instamart.
+- Endpoint: `POST mcp.swiggy.com/im`.
+- Stage: Discover.
+- Behaviour: mutating.
+- Arguments:
+  - required: `fullAddress`, `addressLine`, `addressLine2`, `city`, `postalCode`, `latitude`, `longitude`, `addressCategory`, `userName`, `userPhone`.
+  - optional: `locality`, `addressTag`, `receiverName`, `receiverPhone`.
+- Auth/session rule: session credentials are supplied automatically by the authenticated MCP session; do not pass user identity or access token in tool arguments.
+- Success envelope: `success: true`, `data`, optional `message`.
+- Failure envelope: `success: false`, `error.message`, optional `error.reportLink`, optional `error.reportHint`.
+- Tool-specific data expectations: not specified by docs.
 - Exact Swiggy agent guidance / workflow rules:
   - Ask for complete delivery address as one string, latitude, longitude, user name, user phone, address type, optional label, and whether delivery is for the user or someone else.
   - Do not ask the user separately for `addressLine`, `addressLine2`, `city`, or `postalCode`; parse those automatically from `fullAddress`.
@@ -160,7 +172,22 @@ Tool sections below are the implementation gate. If a section lacks the template
 - `addressCategory` values: `HOME`, `WORK`, `OFFICE`, `FRIENDS_AND_FAMILY`, `OTHER`.
 - Account fields `userName` and `userPhone` represent the authenticated Swiggy user.
 - Receiver fields are only for delivery to someone else.
-- For Flatmeal MVP, prefer existing owner addresses via `get_addresses`; address creation can be present but not central to the demo.
+- Flatmeal workflow interpretation:
+  - For Flatmeal MVP, prefer existing owner addresses via `get_addresses`; address creation can be present but not central to the demo.
+  - Flatmeal must not use this tool to collect Swiggy OTP/password or replace delegated OAuth.
+- Local stub behavior:
+  - Create a saved address for the fake authenticated owner session.
+  - Require every documented required field.
+  - Accept `addressLine2` as an empty string when it cannot be parsed, matching the docs.
+  - Store coordinates for serviceability/tracking simulation, but do not expose raw coordinates from `get_addresses`.
+  - Return a failure envelope for missing required fields or unsupported `addressCategory`.
+- Required contract tests:
+  - requires every documented required argument.
+  - accepts documented optional arguments.
+  - rejects unsupported `addressCategory`.
+  - accepts empty-string `addressLine2`.
+  - created address appears in `get_addresses` without raw coordinates.
+  - does not accept auth/token/user identity arguments.
 
 ### `delete_address`
 
@@ -239,20 +266,87 @@ Tool sections below are the implementation gate. If a section lacks the template
   - workflow blocks `search_products`, `your_go_to_items`, or `update_cart` until selected `addressId` exists in backend cart session state.
   - zero-address response produces a user-visible “add/select address” state, not a search/cart call.
 
-### `search_products` / `your_go_to_items`
+Shared note: `search_products` and `your_go_to_items` both return products with variants, but they remain separate implementation gates.
 
-- Source URLs checked:
-  - https://mcp.swiggy.com/builders/docs/reference/instamart/search_products/
-  - https://mcp.swiggy.com/builders/docs/reference/instamart/your_go_to_items/
+### `search_products`
+
+- Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/search_products/
 - Last checked: 2026-05-01.
+- Tool name: `search_products`.
+- MCP server: Instamart.
+- Endpoint: `POST mcp.swiggy.com/im`.
+- Stage: Discover.
+- Behaviour: read-only.
+- Arguments:
+  - required: `addressId`, `query`.
+  - optional: `offset`.
+- Auth/session rule: session credentials are supplied automatically by the authenticated MCP session; do not pass user identity or access token in tool arguments.
+- Success envelope: `success: true`, `data`, optional `message`.
+- Failure envelope: `success: false`, `error.message`, optional `error.reportLink`, optional `error.reportHint`.
+- Tool-specific data expectations:
+  - returns products available at the selected address.
+  - returns products with variants.
+  - variants include `spinId` for cart updates.
+  - precise product/variant response schema is not specified by docs.
 - Exact Swiggy agent guidance / workflow rules:
-  - `search_products`: always search first for available variants when a user asks to add a new product.
-  - `search_products`: ask/select which specific variant should be added before cart update.
-  - `your_go_to_items`: use `addressId` from `get_addresses`; returned variants also require `spinId` for cart updates.
-- Both return product variants.
-- Cart build must select variant-level `spinId`.
-- For the MVP, the agent can choose obvious variants for staple items, but Telegram preview must expose item/quantity before approval.
-- Local stub should include common staples and meal ingredients: rice, chicken, onion, tomato, curd, milk, oil, spices, dal, ghee, paneer, vegetables, and snacks.
+  - Use `addressId` from `get_addresses`.
+  - When a user asks to add a product, always search first to see available variants.
+  - Ask/select which specific variant should be added before adding to cart.
+- Flatmeal workflow interpretation:
+  - Backend must have a selected `addressId` in cart session state before calling this.
+  - Cart planning may choose obvious variants for staple items, but Telegram approval preview must expose item names and quantities before checkout.
+  - Cart updates must use variant-level `spinId`, not parent product identity.
+- Local stub behavior:
+  - Return products for realistic staples and meal ingredients: rice, chicken, onion, tomato, curd, milk, oil, spices, dal, ghee, paneer, vegetables, snacks.
+  - Include multiple variants where useful, each with `spinId`.
+  - Respect `addressId` serviceability and product stock in fake data.
+  - Support `offset` for simple pagination; default to `0`.
+  - Return a failure envelope for unknown/unserviceable `addressId` or no product match.
+- Required contract tests:
+  - requires `addressId` and `query`.
+  - accepts optional `offset`.
+  - rejects missing or unknown `addressId`.
+  - returns products with variants containing `spinId`.
+  - fails or returns no-results state for product not found.
+  - workflow blocks search until `get_addresses` selection is stored.
+
+### `your_go_to_items`
+
+- Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/your_go_to_items/
+- Last checked: 2026-05-01.
+- Tool name: `your_go_to_items`.
+- MCP server: Instamart.
+- Endpoint: `POST mcp.swiggy.com/im`.
+- Stage: Discover.
+- Behaviour: read-only.
+- Arguments:
+  - required: `addressId`.
+  - optional: `offset`.
+- Auth/session rule: session credentials are supplied automatically by the authenticated MCP session; do not pass user identity or access token in tool arguments.
+- Success envelope: `success: true`, `data`, optional `message`.
+- Failure envelope: `success: false`, `error.message`, optional `error.reportLink`, optional `error.reportHint`.
+- Tool-specific data expectations:
+  - returns the user's frequently or recently ordered items for the selected delivery address.
+  - returns products with variants.
+  - variants include `spinId` for cart updates.
+  - precise product/variant response schema is not specified by docs.
+- Exact Swiggy agent guidance / workflow rules:
+  - Use `addressId` from `get_addresses`.
+  - Use `spinId` from the chosen variant when adding to cart.
+- Flatmeal workflow interpretation:
+  - Optional optimization for quick reorder or low-QPS returning-household flows.
+  - Not required for the first meal-to-cart path, but should be implemented for Swiggy access readiness.
+- Local stub behavior:
+  - Return a small realistic set of frequently ordered products for the fake owner/address.
+  - Include variants with `spinId`.
+  - Support `offset` for simple pagination; default to `0`.
+  - Return an empty success data set when the fake account has no history.
+- Required contract tests:
+  - requires `addressId`.
+  - accepts optional `offset`.
+  - rejects missing or unknown `addressId`.
+  - returns variants containing `spinId`.
+  - empty history is a success state, not an internal error.
 
 ### `clear_cart`
 
@@ -288,32 +382,104 @@ Tool sections below are the implementation gate. If a section lacks the template
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/update_cart/
 - Last checked: 2026-05-01.
+- Tool name: `update_cart`.
+- MCP server: Instamart.
+- Endpoint: `POST mcp.swiggy.com/im`.
+- Stage: Cart.
+- Behaviour: mutating.
+- Arguments:
+  - required: `selectedAddressId`, `items`.
+  - optional: none.
+- Auth/session rule: session credentials are supplied automatically by the authenticated MCP session; do not pass user identity or access token in tool arguments.
+- Success envelope: `success: true`, `data`, optional `message`.
+- Failure envelope: `success: false`, `error.message`, optional `error.reportLink`, optional `error.reportHint`.
+- Tool-specific data expectations:
+  - `items` is an array of objects.
+  - documented item example contains `spinId` and `quantity`.
+  - precise success `data` shape is not specified by docs.
 - Exact Swiggy agent guidance / workflow rules:
   - Use for Instamart grocery orders, not Food.
   - Use `selectedAddressId` from `get_addresses`.
   - Items use `spinId` and `quantity`.
   - This tool replaces the entire cart with the provided items.
-- Replaces the full cart, so backend must maintain the full desired cart list per revision.
-- Adding one item during the free-delivery window means rebuild the complete item list and call `update_cart` again.
-- After every `update_cart`, call `get_cart` before presenting approval.
+- Flatmeal workflow interpretation:
+  - Replaces the full cart, so backend must maintain the full desired cart list per revision.
+  - Adding one item during the free-delivery window means rebuild the complete item list and call `update_cart` again.
+  - After every `update_cart`, call `get_cart` before presenting approval.
+- Local stub behavior:
+  - Replace the fake authenticated session cart with exactly the provided `items`.
+  - Validate `selectedAddressId` exists and is serviceable.
+  - Validate every item has a known in-stock `spinId` and positive integer `quantity`.
+  - Return domain failures for out-of-stock, address not serviceable, or invalid product/address combinations.
+  - Repeated call with the same arguments should produce the same cart state.
+- Required contract tests:
+  - requires `selectedAddressId` and `items`.
+  - rejects missing `spinId` or `quantity`.
+  - rejects unknown `spinId`.
+  - replaces the full cart instead of appending.
+  - safe retry with same args does not duplicate items.
+  - calls after address switch require a safe cart reset path.
 
 ### `get_cart`
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/get_cart/
 - Last checked: 2026-05-01.
+- Tool name: `get_cart`.
+- MCP server: Instamart.
+- Endpoint: `POST mcp.swiggy.com/im`.
+- Stage: Cart.
+- Behaviour: read-only.
+- Arguments:
+  - required: none.
+  - optional: none.
+- Auth/session rule: session credentials are supplied automatically by the authenticated MCP session; do not pass user identity or access token in tool arguments.
+- Success envelope: `success: true`, `data`, optional `message`.
+- Failure envelope: `success: false`, `error.message`, optional `error.reportLink`, optional `error.reportHint`.
+- Tool-specific data expectations:
+  - returns current Swiggy Instamart grocery cart with all items and bill breakdown.
+  - response includes `availablePaymentMethods`.
+  - precise cart item/bill schema is not specified by docs.
 - Exact Swiggy agent guidance / workflow rules:
   - Use for Instamart grocery orders, not Food.
   - Response includes `availablePaymentMethods`.
   - Display whatever payment methods are returned before placing the order.
   - Do not mention or assume payment options not present in the response.
-- Payment methods must come from the response; do not invent payment options.
-- Cart preview must include items, quantities, bill total, address summary, payment method, and cart revision.
-- If cart is below minimum order or has out-of-stock items, surface that in Telegram before approval.
+- Flatmeal workflow interpretation:
+  - Payment methods must come from the response; do not invent payment options.
+  - Cart preview must include items, quantities, bill total, address summary, payment method, and cart revision.
+  - If cart is below minimum order or has out-of-stock items, surface that in Telegram before approval.
+  - Must be called before Telegram approval preview and again before checkout.
+- Local stub behavior:
+  - Return current fake cart items, bill totals, delivery fee/free-delivery threshold, and `availablePaymentMethods`.
+  - Include enough data to render the Telegram approval preview without storing full Swiggy response bodies.
+  - Return domain failure for expired cart or minimum order not met when applicable.
+- Required contract tests:
+  - accepts empty `arguments: {}`.
+  - returns current cart items after `update_cart`.
+  - returns bill breakdown.
+  - returns `availablePaymentMethods`.
+  - does not invent payment methods outside fake cart data.
+  - supports minimum-order and cart-expired failure states.
 
 ### `checkout`
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/checkout/
 - Last checked: 2026-05-01.
+- Tool name: `checkout`.
+- MCP server: Instamart.
+- Endpoint: `POST mcp.swiggy.com/im`.
+- Stage: Order.
+- Behaviour: mutating.
+- Arguments:
+  - required: `addressId`.
+  - optional: `paymentMethod`.
+- Auth/session rule: session credentials are supplied automatically by the authenticated MCP session; do not pass user identity or access token in tool arguments.
+- Success envelope: `success: true`, `data`, optional `message`.
+- Failure envelope: `success: false`, `error.message`, optional `error.reportLink`, optional `error.reportHint`.
+- Tool-specific data expectations:
+  - creates and confirms an Instamart grocery order.
+  - may create separate orders for multi-store carts.
+  - precise order `data` shape is not specified by docs.
 - Exact Swiggy agent guidance / workflow rules:
   - Creates and confirms an Instamart grocery order; not for Food.
   - Automatically handles multi-store carts and may create separate orders per store.
@@ -332,38 +498,192 @@ Tool sections below are the implementation gate. If a section lacks the template
 - If cart value exceeds Swiggy’s allowed limit, do not checkout; tell users to complete/update in Swiggy app.
 - If checkout succeeds, preserve Swiggy/Instamart-branded success message from the tool response where present.
 - If user asks to cancel an Instamart order, do not call an MCP cancellation tool; direct to Swiggy customer care guidance from Swiggy docs.
+- Local stub behavior:
+  - Refuse checkout unless backend passes a valid latest Telegram approval gate in local session context; the real Swiggy tool does not know Telegram, but the local Flatmeal stub/client must enforce this safety gate.
+  - Validate `addressId` matches the selected cart address.
+  - Validate `paymentMethod` is present in the latest `get_cart.availablePaymentMethods` when provided.
+  - Reject duplicate checkout for an already checked-out cart session.
+  - Return fake realistic order IDs and Swiggy/Instamart-branded success message.
+  - Support multi-store fake results if fake data marks cart items from multiple stores.
+  - Simulate uncertain 5xx/network failures for check-then-retry tests.
+- Required contract tests:
+  - requires `addressId`.
+  - accepts optional `paymentMethod`.
+  - fails before latest Telegram approval.
+  - fails on stale approval revision.
+  - fails on duplicate checkout.
+  - calls `get_cart` before checkout in workflow tests.
+  - rejects unavailable `paymentMethod`.
+  - succeeds after latest owner/flatmate approval.
+  - preserves Swiggy/Instamart-branded success message.
+  - uncertain 5xx path checks `get_orders` before retry.
 
-### `get_orders`, `get_order_details`, `track_order`
+### `get_order_details`
 
-- Source URLs checked:
-  - https://mcp.swiggy.com/builders/docs/reference/instamart/get_orders/
-  - https://mcp.swiggy.com/builders/docs/reference/instamart/get_order_details/
-  - https://mcp.swiggy.com/builders/docs/reference/instamart/track_order/
+- Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/get_order_details/
 - Last checked: 2026-05-01.
+- Tool name: `get_order_details`.
+- MCP server: Instamart.
+- Endpoint: `POST mcp.swiggy.com/im`.
+- Stage: Track.
+- Behaviour: read-only.
+- Arguments:
+  - required: `orderId`.
+  - optional: none.
+- Auth/session rule: session credentials are supplied automatically by the authenticated MCP session; do not pass user identity or access token in tool arguments.
+- Success envelope: `success: true`, `data`, optional `message`.
+- Failure envelope: `success: false`, `error.message`, optional `error.reportLink`, optional `error.reportHint`.
+- Tool-specific data expectations:
+  - returns detailed information for a specific Instamart order.
+  - includes full list of items with quantities and prices.
+  - includes itemized bill breakdown: item total, delivery fee, handling fee, grand total.
+  - includes order status and refund information when applicable.
+  - store information, delivery address, and real-time tracking belong in `get_orders` or `track_order`, not this tool.
+  - precise response schema is not specified by docs.
 - Exact Swiggy agent guidance / workflow rules:
-  - `get_orders`: use first for order history, recent orders, reorders, or active/current orders.
-  - `get_orders`: set `activeOnly=true` for active/current/ongoing order requests.
-  - `get_orders`: for cancellation requests, do not call a cancellation tool; tell the user to contact Swiggy customer care.
-  - `get_order_details`: use when the user wants detailed items, bill breakdown, order status, or refunds for a specific order.
-  - `get_order_details`: get `orderId` from `get_orders` first if needed.
-  - `track_order`: primary tool for live order status/ETA.
-  - `track_order`: requires `orderId`, `lat`, and `lng`; if user does not provide `orderId`, call `get_orders` first.
-- Use `get_orders` for recent/active orders and for checkout uncertainty resolution.
-- Use `get_order_details` for full item/bill/refund details.
-- Use `track_order` for live status/ETA; requires delivery coordinates from order data.
+  - Use when the user wants complete details about a specific order.
+  - Use for item list, bill breakdown, order status, or refunds for a specific order.
+  - Obtain `orderId` from `get_orders` first when needed.
+- Flatmeal workflow interpretation:
+  - Use for order-support questions, not for checkout.
+  - Read-only support agent may call this after backend phase and role checks.
+- Local stub behavior:
+  - Return itemized details for fake orders created by `checkout`.
+  - Return a failure envelope for unknown `orderId`.
+  - Include refund field/status only when fake data marks a refund; otherwise use a clear empty/none value.
+- Required contract tests:
+  - requires `orderId`.
+  - fails for unknown `orderId`.
+  - returns items with quantities and prices.
+  - returns itemized bill breakdown.
+  - returns order status.
+  - support workflow obtains missing `orderId` from `get_orders`.
+
+### `get_orders`
+
+- Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/get_orders/
+- Last checked: 2026-05-01.
+- Tool name: `get_orders`.
+- MCP server: Instamart.
+- Endpoint: `POST mcp.swiggy.com/im`.
+- Stage: Track.
+- Behaviour: read-only.
+- Arguments:
+  - required: none.
+  - optional: `count`, `orderType`, `activeOnly`.
+- Auth/session rule: session credentials are supplied automatically by the authenticated MCP session; do not pass user identity or access token in tool arguments.
+- Success envelope: `success: true`, `data`, optional `message`.
+- Failure envelope: `success: false`, `error.message`, optional `error.reportLink`, optional `error.reportHint`.
+- Tool-specific data expectations:
+  - returns a list of orders from the last 15 days.
+  - basic details include items, status, and delivery address coordinates.
+  - `count` default is 10; docs recommend max 20.
+  - `orderType` default is `DASH`.
+  - `activeOnly` default is false.
+  - precise order list schema is not specified by docs.
+- Exact Swiggy agent guidance / workflow rules:
+  - Use first for order history, past orders, recent orders, order preferences, frequent items, reorder, or order-again requests.
+  - Set `activeOnly=true` for active/current/ongoing/pending/in-progress/on-the-way/current-delivery requests.
+  - For real-time tracking of a specific order, use `track_order`; get `orderId` and coordinates from this tool if needed.
+  - For cancellation requests, do not call a cancellation tool; tell the user to call Swiggy customer care at `080-67466729`.
+- Flatmeal workflow interpretation:
+  - Use after uncertain checkout failure before retrying checkout.
+  - Use for order-support context and to resolve missing `orderId`.
+  - Do not expose raw delivery coordinates to Telegram unless needed for user-visible delivery context.
+- Local stub behavior:
+  - Return fake recent orders created by local `checkout`.
+  - Support `activeOnly` filtering.
+  - Support `count` with default 10 and a practical cap at 20.
+  - Support `orderType` for the documented default while keeping MVP data Instamart-only.
+  - Include delivery coordinates internally for `track_order` tests.
+- Required contract tests:
+  - accepts empty `arguments: {}`.
+  - accepts optional `count`, `orderType`, `activeOnly`.
+  - defaults to recent orders with count 10.
+  - caps or validates count above 20.
+  - `activeOnly=true` returns only active fake orders.
+  - uncertain checkout failure flow calls this before retry.
+  - cancellation workflow returns customer-care guidance and calls no cancellation tool.
+
+### `track_order`
+
+- Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/track_order/
+- Last checked: 2026-05-01.
+- Tool name: `track_order`.
+- MCP server: Instamart.
+- Endpoint: `POST mcp.swiggy.com/im`.
+- Stage: Track.
+- Behaviour: read-only.
+- Arguments:
+  - required: `orderId`, `lat`, `lng`.
+  - optional: none.
+- Auth/session rule: session credentials are supplied automatically by the authenticated MCP session; do not pass user identity or access token in tool arguments.
+- Success envelope: `success: true`, `data`, optional `message`.
+- Failure envelope: `success: false`, `error.message`, optional `error.reportLink`, optional `error.reportHint`.
+- Tool-specific data expectations:
+  - returns real-time tracking info.
+  - includes current status, ETA, delivery partner location, store info, delivery address, ordered items, and payment details.
+  - precise tracking response schema is not specified by docs.
+- Exact Swiggy agent guidance / workflow rules:
+  - Primary tool for order tracking.
+  - Use first when the user asks where an order is, asks to track an order, asks order status, ETA, delivery progress, or whether it has been delivered.
+  - Requires `orderId` and delivery address coordinates.
+  - If the user does not provide `orderId`, first use `get_orders` to find the order, then track it.
+- Flatmeal workflow interpretation:
+  - Use immediately after successful checkout to post initial tracking state.
+  - Avoid polling faster than every 10 seconds.
+  - Delivery coordinates should come from trusted order/address state, not from user free text when avoidable.
+- Local stub behavior:
+  - Return fake tracking timeline for local checkout orders.
+  - Return failure envelope for unknown `orderId`.
+  - Validate `lat` and `lng` are numbers.
+  - Simulate status transitions for demo and tests.
+- Required contract tests:
+  - requires `orderId`, `lat`, and `lng`.
+  - fails for unknown `orderId`.
+  - returns status and ETA.
+  - returns store/order/address/payment summary fields used by support flow.
+  - workflow calls `get_orders` first when `orderId` is absent.
+  - workflow enforces at least 10 seconds between polling attempts.
 
 ### `report_error`
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/report_error/
 - Last checked: 2026-05-01.
+- Tool name: `report_error`.
+- MCP server: Instamart.
+- Endpoint: `POST mcp.swiggy.com/im`.
+- Stage: Support.
+- Behaviour: mutating.
+- Arguments:
+  - required: `tool`, `errorMessage`.
+  - optional: `domain`, `flowDescription`, `toolContext`, `userNotes`.
+- Auth/session rule: session credentials are supplied automatically by the authenticated MCP session; do not pass user identity or access token in tool arguments.
+- Success envelope: `success: true`, `data`, optional `message`.
+- Failure envelope: `success: false`, `error.message`, optional `error.reportLink`, optional `error.reportHint`.
+- Tool-specific data expectations:
+  - returns a pre-filled mailto link and human-readable summary.
+  - logs the report server-side even if the email is not sent.
+  - precise response schema is not specified by docs.
 - Exact Swiggy agent guidance / workflow rules:
   - Use when the user encounters an error and wants to report it.
   - Include `toolContext` with specific identifiers from the failed tool call.
   - Include all relevant IDs that were part of the failed request, such as `orderId`, `addressId`, `spinId`, `query`, `paymentMethod`, or cart IDs.
   - Returns a report summary/link; server-side report logging may happen even if email is not sent.
-- Use when a persistent Swiggy tool failure needs diagnostics.
-- Include sanitized `toolContext` with relevant IDs such as `orderId`, `addressId`, `spinId`, `query`, `paymentMethod`, or cart identifiers.
-- Do not include tokens, OTPs, raw full addresses, or raw sensitive transcripts.
+- Flatmeal workflow interpretation:
+  - Use when a persistent Swiggy tool failure needs diagnostics or the user asks to report it.
+  - Include sanitized `toolContext` with relevant IDs such as `orderId`, `addressId`, `spinId`, `query`, `paymentMethod`, or cart identifiers.
+  - Do not include tokens, OTPs, raw full addresses, raw sensitive transcripts, payment details, or full request/response bodies.
+- Local stub behavior:
+  - Return a fake diagnostic report summary/link.
+  - Store only sanitized context in local event/test state.
+  - Reject missing `tool` or `errorMessage`.
+- Required contract tests:
+  - requires `tool` and `errorMessage`.
+  - accepts optional `domain`, `flowDescription`, `toolContext`, `userNotes`.
+  - returns report summary/link.
+  - includes relevant safe IDs from `toolContext`.
+  - strips or rejects tokens, OTPs, full addresses, raw transcripts, and payment details.
 
 ## Local Stub Required Failure Scenarios
 
