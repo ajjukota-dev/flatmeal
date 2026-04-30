@@ -1,6 +1,6 @@
 # Flatmeal Milestone Tracker
 
-Persistent progress tracker for coding agents. Update this file after every meaningful feature, checkpoint, blocker, verification run, or user-approved commit/push.
+Persistent progress tracker for coding agents. Update this file after every meaningful feature, checkpoint, blocker, verification run, or agent-created commit/push.
 
 ## Current Milestone
 
@@ -55,10 +55,11 @@ Persistent progress tracker for coding agents. Update this file after every mean
 
 - 2026-05-01: Docs reviewed and updated for Telegram-first MVP, Swiggy delegated OAuth, local Instamart MCP contract extraction, and milestone workflow.
 - 2026-05-01: Added `docs/ai-agent-architecture.md` as the source of truth for OpenAI specialist agents, backend-owned safety gates, Supabase memory, tool exposure, traces, and evals. Updated session/agent docs to require reading it.
+- 2026-05-01: Updated milestone Git workflow so future agents may commit and push after significant milestones without asking again, while blocking commit/push on unrelated changes, failed milestone verification, missing remote/credentials, or explicit user opt-out.
 
 ## Commit / Push History
 
-- No commits or pushes recorded by agents yet.
+- 2026-05-01: Agent created and pushed a docs-only update on `main` covering the milestone Git workflow in `AGENTS.md`, `docs/new-session-prompt.md`, and this tracker.
 
 ## Milestone Update Template
 

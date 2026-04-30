@@ -212,10 +212,12 @@ Work milestone by milestone.
 - Plan the next 3-5 concrete steps and how each will be verified.
 - Update `docs/milestone-tracker.md` after every meaningful feature, checkpoint, blocker, or verification run.
 - Keep tracker updates concise: what changed, what was verified, what remains, and any blocker.
-- After a significant milestone, summarize changed files, verification run, and a proposed commit message.
+- After a significant milestone, summarize changed files, verification run, and the commit message used or planned.
 - Use clear commit messages such as `feat: add telegram onboarding flow`, `test: add instamart contract tests`, or `docs: update milestone tracker`.
-- Do not run `git commit` or `git push` silently. Ask for explicit user approval before committing or pushing.
-- If the user approves, commit only relevant files and push only the intended branch/remote.
+- After a significant milestone, commit and push without asking again if the repo has a configured remote and the working tree only contains changes relevant to the milestone.
+- Commit only relevant files and push only the intended current branch/remote.
+- Do not commit or push if unrelated user changes are present, verification is failing for milestone-related reasons, no remote is configured, credentials are unavailable, or the user explicitly says not to commit/push.
+- Record each agent-created commit/push in `docs/milestone-tracker.md`.
 
 ## 12. Production-Ready Bias
 

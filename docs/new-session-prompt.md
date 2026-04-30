@@ -38,8 +38,9 @@ During work:
 - Update docs/milestone-tracker.md after every meaningful milestone, checkpoint, blocker, or verification run.
 - Run relevant tests/checks.
 - After a significant milestone, summarize changed files and verification run.
-- Propose a clear commit message.
-- Ask before running git commit or git push.
+- Commit with a clear message and push without asking again when the repo has a configured remote and only milestone-relevant changes are present.
+- Do not commit or push if unrelated user changes are present, verification is failing for milestone-related reasons, no remote is configured, credentials are unavailable, or I explicitly say not to commit/push.
+- Record each agent-created commit/push in docs/milestone-tracker.md.
 
 Swiggy-specific workflow:
 1. Fetch the relevant live Swiggy docs first.
