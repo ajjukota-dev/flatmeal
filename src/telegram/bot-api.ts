@@ -17,6 +17,16 @@ export type TelegramFile = {
   file_path?: string;
 };
 
+export type TelegramBotUser = {
+  id: number;
+  is_bot: boolean;
+  first_name: string;
+  username?: string;
+  can_join_groups?: boolean;
+  can_read_all_group_messages?: boolean;
+  supports_inline_queries?: boolean;
+};
+
 export type DownloadedTelegramFile = {
   file: TelegramFile;
   filename: string;
@@ -90,6 +100,10 @@ export class TelegramBotApi {
 
   async getFile(fileId: string): Promise<TelegramFile> {
     return this.call<TelegramFile>("getFile", { file_id: fileId });
+  }
+
+  async getMe(): Promise<TelegramBotUser> {
+    return this.call<TelegramBotUser>("getMe", {});
   }
 
   async downloadFile(filePath: string): Promise<Buffer> {

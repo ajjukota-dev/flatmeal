@@ -9,6 +9,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
+    "smoke:m5": "tsx scripts/smoke-local-m5.ts",
+    "smoke:m5:local": "tsx scripts/smoke-local-m5.ts",
+    "smoke:m5:openai": "tsx scripts/smoke-live-openai.ts",
+    "smoke:m5:sarvam": "tsx scripts/smoke-live-sarvam.ts",
+    "smoke:m5:telegram": "tsx scripts/smoke-telegram-config.ts",
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"

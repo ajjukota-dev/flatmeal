@@ -98,6 +98,38 @@ describe("TelegramBotApi", () => {
     ]);
   });
 
+  it("reads bot configuration through getMe", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const bot = new TelegramBotApi("123:secret", async (url, init) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+      return Response.json({
+        ok: true,
+        result: {
+          id: 42,
+          is_bot: true,
+          first_name: "Flatmeal",
+          username: "flatmeal_bot",
+          can_join_groups: true,
+          can_read_all_group_messages: false,
+        },
+      });
+    });
+
+    await expect(bot.getMe()).resolves.toMatchObject({
+      id: 42,
+      is_bot: true,
+      username: "flatmeal_bot",
+      can_read_all_group_messages: false,
+    });
+
+    expect(calls).toEqual([
+      {
+        url: "https://api.telegram.org/bot123:secret/getMe",
+        body: {},
+      },
+    ]);
+  });
+
   it("uploads cook prompts with sendVoice multipart fields", async () => {
     const calls: Array<{ url: string; body?: BodyInit | null }> = [];
     const bot = new TelegramBotApi("123:secret", async (url, init) => {
