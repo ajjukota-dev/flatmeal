@@ -22,7 +22,7 @@ export const intentEnvelopeSchema = z
     language: detectedLanguageSchema.optional(),
     reason: z.string().trim().min(1),
     requiresClarification: z.boolean(),
-    clarificationQuestion: z.string().trim().min(1).optional(),
+    clarificationQuestion: z.string().trim().optional(),
   })
   .strict();
 
@@ -58,7 +58,7 @@ export const missingItemsExtractionSchema = z
   .object({
     items: z.array(missingItemSchema),
     requiresClarification: z.boolean(),
-    clarificationQuestion: z.string().trim().min(1).optional(),
+    clarificationQuestion: z.string().trim().optional(),
   })
   .strict();
 

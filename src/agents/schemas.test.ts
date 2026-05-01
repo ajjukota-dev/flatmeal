@@ -18,6 +18,17 @@ describe("agent structured output schemas", () => {
         requiresClarification: false,
       }),
     ).toMatchObject({ intent: "flatmate_meal_request" });
+
+    expect(
+      intentEnvelopeSchema.parse({
+        intent: "flatmate_meal_request",
+        confidence: 0.91,
+        language: "hinglish",
+        reason: "Flatmate is asking the cook to make dinner.",
+        requiresClarification: false,
+        clarificationQuestion: "",
+      }),
+    ).toMatchObject({ clarificationQuestion: "" });
   });
 
   it("rejects invalid intent envelopes", () => {
@@ -72,6 +83,7 @@ describe("agent structured output schemas", () => {
       missingItemsExtractionSchema.parse({
         items: [{ name: "rice", quantity: 2, unit: "kg", confidence: 0.88 }],
         requiresClarification: false,
+        clarificationQuestion: "",
       }),
     ).toMatchObject({ items: [{ name: "rice" }] });
 
