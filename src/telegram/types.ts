@@ -56,6 +56,18 @@ export type TelegramAction =
       authUrl: string;
     }
   | {
+      type: "send_text_message";
+      chatId: string;
+      text: string;
+    }
+  | {
+      type: "send_voice_note";
+      chatId: string;
+      voice: Blob;
+      filename: string;
+      caption?: string;
+    }
+  | {
       type: "answer_callback";
       callbackQueryId: string;
       text: string;

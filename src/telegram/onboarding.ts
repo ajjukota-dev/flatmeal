@@ -1,4 +1,5 @@
 import { parseCallbackData } from "./callback-data.js";
+import type { TelegramMessageWorkflowService } from "./message-workflow.js";
 import type { TelegramOnboardingRepository } from "./repository.js";
 import type { TelegramAction, TelegramMessage, TelegramUpdate } from "./types.js";
 
@@ -16,6 +17,7 @@ export class TelegramOnboardingService {
   constructor(
     private readonly repository: TelegramOnboardingRepository,
     private readonly options: OnboardingOptions,
+    private readonly messageWorkflow?: TelegramMessageWorkflowService,
   ) {}
 
   async handleUpdate(update: TelegramUpdate): Promise<TelegramUpdateResult> {
@@ -148,7 +150,24 @@ export class TelegramOnboardingService {
       };
     }
 
-    return { duplicate: false, actions: [] };
+    if (!user || !event.id || !this.messageWorkflow) {
+      return { duplicate: false, actions: [] };
+    }
+
+    const member = await this.repository.findHouseholdMember({
+      householdId: chat.householdId,
+      telegramUserId: user.id,
+    });
+
+    return {
+      duplicate: false,
+      actions: await this.messageWorkflow.handleMessage({
+        chat,
+        member,
+        messageEventId: event.id,
+        message,
+      }),
+    };
   }
 
   private wasBotAdded(message: TelegramMessage): boolean {

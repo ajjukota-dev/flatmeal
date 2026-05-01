@@ -62,6 +62,23 @@ describe("TelegramBotApi", () => {
     });
   });
 
+  it("dispatches workflow text messages", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const bot = new TelegramBotApi("123:secret", async (url, init) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+      return Response.json({ ok: true, result: true });
+    });
+
+    await bot.dispatch({ type: "send_text_message", chatId: "-100", text: "Cook prompt" });
+
+    expect(calls).toEqual([
+      {
+        url: "https://api.telegram.org/bot123:secret/sendMessage",
+        body: { chat_id: "-100", text: "Cook prompt" },
+      },
+    ]);
+  });
+
   it("downloads Telegram voice files through getFile file_path", async () => {
     const calls: Array<{ url: string; body?: unknown }> = [];
     const bot = new TelegramBotApi("123:secret", async (url, init) => {
@@ -152,5 +169,28 @@ describe("TelegramBotApi", () => {
     expect((body as FormData).get("voice")).toBeInstanceOf(Blob);
     expect((body as FormData).get("caption")).toBe("Cook prompt");
     expect((body as FormData).get("duration")).toBe("4");
+  });
+
+  it("dispatches workflow voice notes", async () => {
+    const calls: Array<{ url: string; body?: BodyInit | null }> = [];
+    const bot = new TelegramBotApi("123:secret", async (url, init) => {
+      calls.push({ url: String(url), body: init?.body });
+      return Response.json({ ok: true, result: { message_id: 1 } });
+    });
+
+    await bot.dispatch({
+      type: "send_voice_note",
+      chatId: "-100",
+      voice: new Blob(["voice"], { type: "audio/ogg" }),
+      filename: "cook_prompt.ogg",
+      caption: "Cook prompt",
+    });
+
+    expect(calls[0]?.url).toBe("https://api.telegram.org/bot123:secret/sendVoice");
+    const body = calls[0]?.body;
+    expect(body).toBeInstanceOf(FormData);
+    expect((body as FormData).get("chat_id")).toBe("-100");
+    expect((body as FormData).get("voice")).toBeInstanceOf(Blob);
+    expect((body as FormData).get("caption")).toBe("Cook prompt");
   });
 });

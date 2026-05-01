@@ -92,6 +92,24 @@ export class TelegramBotApi {
       return;
     }
 
+    if (action.type === "send_text_message") {
+      await this.sendMessage({
+        chat_id: action.chatId,
+        text: action.text,
+      });
+      return;
+    }
+
+    if (action.type === "send_voice_note") {
+      await this.sendVoice({
+        chatId: action.chatId,
+        voice: action.voice,
+        filename: action.filename,
+        caption: action.caption,
+      });
+      return;
+    }
+
     await this.call("answerCallbackQuery", {
       callback_query_id: action.callbackQueryId,
       text: action.text,

@@ -1,12 +1,15 @@
 import express from "express";
+import { OpenAISpecialistAgents } from "./agents/specialists.js";
 import type { AppEnv } from "./config/env.js";
 import { createSupabaseAdminClient } from "./database/supabase.js";
 import { LocalInstamartMcpStub } from "./instamart/local-mcp-stub.js";
 import { createInstamartMcpRouter } from "./instamart/mcp-router.js";
+import { SarvamSpeechProvider } from "./speech/sarvam.js";
 import { createSwiggyOAuthRouter } from "./swiggy-oauth/routes.js";
 import { SwiggyOAuthService } from "./swiggy-oauth/service.js";
 import { SupabaseSwiggyOAuthRepository } from "./swiggy-oauth/supabase-repository.js";
 import { TelegramBotApi } from "./telegram/bot-api.js";
+import { TelegramMessageWorkflowService } from "./telegram/message-workflow.js";
 import { TelegramOnboardingService } from "./telegram/onboarding.js";
 import { SupabaseTelegramRepository } from "./telegram/supabase-repository.js";
 
@@ -18,10 +21,19 @@ export function createServer(env: AppEnv) {
   const swiggyOAuth = new SwiggyOAuthService(swiggyOAuthRepository, env);
   const instamartMcpStub = new LocalInstamartMcpStub();
   const telegramBot = new TelegramBotApi(env.TELEGRAM_BOT_TOKEN);
+  const specialistAgents = new OpenAISpecialistAgents();
+  const sarvamSpeech = new SarvamSpeechProvider({ apiKey: env.SARVAM_API_KEY });
+  const telegramMessageWorkflow = new TelegramMessageWorkflowService(
+    telegramRepository,
+    specialistAgents,
+    sarvamSpeech,
+    sarvamSpeech,
+    telegramBot,
+  );
   const telegramOnboarding = new TelegramOnboardingService(telegramRepository, {
     botUserId: env.TELEGRAM_BOT_TOKEN.split(":")[0],
     publicBaseUrl: env.PUBLIC_BASE_URL,
-  });
+  }, telegramMessageWorkflow);
 
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));

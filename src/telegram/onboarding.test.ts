@@ -6,6 +6,9 @@ import type {
   StoredHouseholdMember,
   StoredTelegramUser,
   TelegramOnboardingRepository,
+  AgentRunInsert,
+  StoredCookMember,
+  VoiceAssetInsert,
 } from "./repository.js";
 import type { CookLanguage, HouseholdRole, TelegramChat, TelegramUser } from "./types.js";
 
@@ -16,13 +19,13 @@ class InMemoryTelegramRepository implements TelegramOnboardingRepository {
   members = new Map<string, StoredHouseholdMember>();
   cookLanguages = new Map<string, CookLanguage>();
 
-  async recordMessageEvent(input: MessageEventInsert): Promise<{ duplicate: boolean }> {
+  async recordMessageEvent(input: MessageEventInsert): Promise<{ id?: string; duplicate: boolean }> {
     const updateId = String(input.update.update_id);
     if (this.messageUpdateIds.has(updateId)) {
       return { duplicate: true };
     }
     this.messageUpdateIds.add(updateId);
-    return { duplicate: false };
+    return { id: `message-event-${updateId}`, duplicate: false };
   }
 
   async ensureHouseholdForChat(chat: TelegramChat): Promise<StoredHouseholdChat> {
@@ -82,6 +85,26 @@ class InMemoryTelegramRepository implements TelegramOnboardingRepository {
   async setCookLanguage(input: { householdMemberId: string; language: CookLanguage }): Promise<void> {
     this.cookLanguages.set(input.householdMemberId, input.language);
   }
+
+  async findCookForHousehold(_householdId: string): Promise<StoredCookMember | null> {
+    return null;
+  }
+
+  async recordVoiceAsset(_input: VoiceAssetInsert): Promise<{ id: string }> {
+    return { id: "voice-asset-1" };
+  }
+
+  async markVoiceAssetTranscribed(_input: { id: string; transcript: string; languageCode?: string | null }): Promise<void> {}
+
+  async markVoiceAssetFailed(_input: { id: string }): Promise<void> {}
+
+  async createAgentRun(_input: AgentRunInsert): Promise<{ id: string }> {
+    return { id: "agent-run-1" };
+  }
+
+  async completeAgentRun(_input: { id: string; intent?: string; sanitizedOutput: Record<string, unknown> }): Promise<void> {}
+
+  async failAgentRun(_input: { id: string; errorSummary: string }): Promise<void> {}
 }
 
 describe("TelegramOnboardingService", () => {

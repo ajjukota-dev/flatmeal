@@ -4,9 +4,9 @@ Persistent progress tracker for coding agents. Update this file after every mean
 
 ## Current Milestone
 
-- **Current:** M5 — OpenAI agent intent/extraction, Sarvam STT/TTS, cook prompt flow.
-- **Status:** In progress.
-- **Goal:** Add backend-managed OpenAI specialist-agent phases and Sarvam speech adapters for Telegram text/voice intent extraction and cook prompt delivery, without letting agents own cart truth or checkout state.
+- **Current:** M6 — Cart build, add-more window, approval revisioning, checkout simulation.
+- **Status:** Ready to start.
+- **Goal:** Build carts from extracted missing items through the local Instamart MCP stub, present revisioned Telegram cart approval, and simulate checkout only after latest explicit owner/flatmate approval.
 
 ## Build Order
 
@@ -48,23 +48,27 @@ Persistent progress tracker for coding agents. Update this file after every mean
   - Added all 13 documented Instamart tool names and contract-tested local handlers.
   - Added variant-level `spinId` search/go-to results, full-cart replacement, bill/payment cart reads, checkout approval gate, order history/details/tracking, and sanitized `report_error`.
   - Added uncertain-checkout simulation that requires `get_orders` verification before retry.
+- **M5 — OpenAI agent intent/extraction, Sarvam STT/TTS, cook prompt flow.**
+  - Rechecked OpenAI Agents SDK, Sarvam STT/TTS, Telegram Bot API, Supabase RLS docs, and relevant local product docs before implementation.
+  - Added strict structured-output schemas and backend-managed OpenAI specialist-agent wrappers.
+  - Added Sarvam STT/TTS providers and Telegram voice download/send primitives.
+  - Added pre-M6 smoke verification for local agent/tool trajectory and gated live provider checks.
+  - Wired Telegram text/voice messages into backend-owned M5 workflow with `voice_assets` STT persistence, `agent_runs` persistence, cook prompt text delivery, and Sarvam-generated cook voice notes.
 
 ## In Progress
 
-- M5 is in progress:
-  - Re-read OpenAI, Sarvam, Telegram, and agent architecture docs before coding.
-  - Fetched current OpenAI Agents SDK and Sarvam STT/TTS docs before implementation.
-  - Add structured intent/extraction schemas and backend-managed specialist-agent wrappers.
-  - Add Sarvam STT/TTS adapters behind small provider interfaces.
-  - Keep Supabase as authoritative memory; agent/session state must not own cart, approval, OAuth, address, or order truth.
+- M6 is ready to start:
+  - Cart build must use the local Instamart MCP stub and extracted Swiggy tool contracts.
+  - Approval callbacks must include `cartSessionId` and `revision`.
+  - Supabase remains authoritative for cart truth, approval state, OAuth state, selected address, and order state.
 
 ## Next Tasks
 
-1. Fetch current OpenAI Agents SDK docs and Sarvam STT/TTS docs.
-2. Add strict structured-output schemas for intent, meal request, cook prompt, missing items, and cart plan.
-3. Implement backend-owned agent wrapper interfaces for intent and extraction phases.
-4. Add Sarvam STT/TTS provider interfaces and Telegram voice-note placeholders.
-5. Verify with focused unit tests, `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
+1. Re-fetch relevant live Swiggy docs for `get_addresses`, `search_products`, `update_cart`, `get_cart`, `checkout`, and `track_order`.
+2. Add cart-session repository/state transition tests for selected address, revision, approval pending, latest approval, stale approval rejection, and duplicate checkout prevention.
+3. Implement cart build from `missing_items_agent` output through allowed local MCP tools only.
+4. Add Telegram cart preview with approval callback data containing `cartSessionId` and `revision`.
+5. Verify with focused cart/approval tests, Instamart trajectory tests, `npm run smoke:m5`, `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
 
 ## Blockers
 
@@ -98,6 +102,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Rechecked live Telegram Bot API docs for `Voice`, `getFile`, file download URLs, and `sendVoice`. Added Telegram voice-file download and multipart `sendVoice` primitives for future Sarvam STT/TTS wiring. Verified with `npm test -- src/telegram/bot-api.test.ts` and `npm run typecheck`.
 - 2026-05-01: Completed M5 foundation slice for structured OpenAI specialist agents, Sarvam speech adapters, and Telegram voice primitives. Verified with `npm test` (10 files / 40 tests), `npm run typecheck`, `npm run build`, and `git diff --check`. Remaining M5 work is wiring these primitives into the Telegram message workflow and persisting `voice_assets`/`agent_runs` records.
 - 2026-05-01: Added pre-M6 M5 smoke verification layer after re-reading local product docs and fetching current OpenAI Agents SDK, Sarvam STT/TTS, Telegram Bot API, and relevant Swiggy Instamart docs into `/private/tmp`. Added deterministic local smoke coverage for the M5 specialist-agent wrapper and M4 Instamart trajectory, plus gated live smoke commands for OpenAI, Sarvam, and Telegram bot config. Verified with `npm run smoke:m5`, `npm run smoke:m5:openai` (skips without `RUN_LIVE_OPENAI_SMOKE=true` and `OPENAI_API_KEY`), `npm run smoke:m5:sarvam` (skips without `RUN_LIVE_SARVAM_SMOKE=true` and `SARVAM_API_KEY`), `npm run smoke:m5:telegram` (skips without `RUN_LIVE_TELEGRAM_SMOKE=true` and `TELEGRAM_BOT_TOKEN`), `npm test` (10 files / 41 tests), `npm run typecheck`, `npm run build`, and `git diff --check`.
+- 2026-05-01: Completed remaining M5 Telegram message workflow after re-reading local docs and fetching current OpenAI Agents SDK, Sarvam STT/TTS, Telegram Bot API, and Supabase RLS docs. Added backend-owned text/voice message handling, incoming voice STT persistence in `voice_assets`, OpenAI specialist run persistence in `agent_runs`, Sarvam TTS cook voice-note generation, Telegram text/voice workflow actions, and server wiring. Verified with `npm test -- src/telegram/message-workflow.test.ts src/telegram/onboarding.test.ts src/telegram/bot-api.test.ts`, `npm run typecheck`, `npm test` (11 files / 45 tests), `npm run build`, `npm run smoke:m5`, gated live smoke skips for OpenAI/Sarvam/Telegram, `git diff --check`, and Supabase MCP SQL confirming `message_events`, `voice_assets`, and `agent_runs` columns with RLS enabled.
 
 ## Commit / Push History
 
