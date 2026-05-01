@@ -107,7 +107,8 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Agent created and pushed M3 fake Swiggy OAuth update on `main` covering PKCE routes, owner-only connection start, encrypted fake token storage, Telegram owner connect links, and this tracker.
 - 2026-05-01: Agent created and pushed docs verification update on `main` covering stricter per-task live-doc review rules in `AGENTS.md` and M0-M3 live Swiggy verification in this tracker.
 - 2026-05-01: Agent created and pushed M4 local Instamart MCP stub update on `main` covering 13 contract-tested local tools, `/mcp/instamart` JSON-RPC route wiring, checkout safety gates, and this tracker.
-- 2026-05-01: Agent created M5 foundation commit on `main` covering OpenAI structured specialist-agent wrappers, Sarvam STT/TTS provider adapters, Telegram voice primitives, and this tracker. Push pending.
+- 2026-05-01: Agent created and pushed M5 foundation commit `eabb466` on `main` covering OpenAI structured specialist-agent wrappers, Sarvam STT/TTS provider adapters, Telegram voice primitives, and this tracker.
+- 2026-05-01: Agent created and pushed a docs-only tracker follow-up on `main` recording the M5 foundation push state.
 
 ## Milestone Update Template
 
