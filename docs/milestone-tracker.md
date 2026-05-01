@@ -4,9 +4,9 @@ Persistent progress tracker for coding agents. Update this file after every mean
 
 ## Current Milestone
 
-- **Current:** M4 — Local Instamart MCP stub with all 13 contract-tested tools.
+- **Current:** M5 — OpenAI agent intent/extraction, Sarvam STT/TTS, cook prompt flow.
 - **Status:** Ready to start.
-- **Goal:** Write contract tests from the extracted Swiggy Instamart contracts, then implement the local MCP-compatible stub without inventing undocumented fields or workflow rules.
+- **Goal:** Add backend-managed OpenAI specialist-agent phases and Sarvam speech adapters for Telegram text/voice intent extraction and cook prompt delivery, without letting agents own cart truth or checkout state.
 
 ## Build Order
 
@@ -42,22 +42,28 @@ Persistent progress tracker for coding agents. Update this file after every mean
   - Added owner-only Swiggy connect start checks backed by Supabase household membership.
   - Added encrypted fake access-token storage in `swiggy_connections`.
   - Added Telegram owner connect-link action after owner role selection.
+- **M4 — Local Instamart MCP stub with all 13 contract-tested tools.**
+  - Rechecked live Swiggy Instamart/auth/error docs before implementation.
+  - Added local MCP-compatible `/mcp/instamart` JSON-RPC endpoint shape.
+  - Added all 13 documented Instamart tool names and contract-tested local handlers.
+  - Added variant-level `spinId` search/go-to results, full-cart replacement, bill/payment cart reads, checkout approval gate, order history/details/tracking, and sanitized `report_error`.
+  - Added uncertain-checkout simulation that requires `get_orders` verification before retry.
 
 ## In Progress
 
-- M4 is ready to begin:
-  - Write contract tests for all 13 Instamart tool names and local workflow gates.
-  - Implement only those local stub fields and branches already captured in `docs/swiggy-instamart-tool-contracts.md`.
-  - Keep checkout blocked behind latest explicit Telegram cart approval.
-  - Surface undocumented fields as `not specified by docs` in the contract docs rather than inventing shapes.
+- M5 is ready to begin:
+  - Re-read OpenAI, Sarvam, Telegram, and agent architecture docs before coding.
+  - Add structured intent/extraction schemas and backend-managed specialist-agent wrappers.
+  - Add Sarvam STT/TTS adapters behind small provider interfaces.
+  - Keep Supabase as authoritative memory; agent/session state must not own cart, approval, OAuth, address, or order truth.
 
 ## Next Tasks
 
-1. Re-open `docs/swiggy-instamart-tool-contracts.md` and map each completed tool section to one or more contract tests.
-2. Add local MCP stub contract tests for tool discovery, argument validation, response envelopes, and documented workflow gates.
-3. Implement the smallest local Instamart MCP stub that satisfies those tests.
-4. Add checkout safety tests for latest approval, stale revision rejection, and non-idempotent retry posture.
-5. Run contract tests plus TypeScript typecheck/build before moving to M5.
+1. Fetch current OpenAI Agents SDK docs and Sarvam STT/TTS docs.
+2. Add strict structured-output schemas for intent, meal request, cook prompt, missing items, and cart plan.
+3. Implement backend-owned agent wrapper interfaces for intent and extraction phases.
+4. Add Sarvam STT/TTS provider interfaces and Telegram voice-note placeholders.
+5. Verify with focused unit tests, `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
 
 ## Blockers
 
@@ -81,6 +87,9 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Fetched live Telegram Bot API docs before M2 implementation. Completed Telegram onboarding slice with webhook intake, setup card sending, role callbacks, first-owner-wins protection, cook language persistence, Telegram sender tests, and Supabase repository boundary. Verified with `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
 - 2026-05-01: Fetched live Swiggy authentication and delegated-auth docs before M3 implementation. Completed fake Swiggy OAuth with PKCE S256 authorization URL generation, state/code validation, single-use code exchange, owner-only connection start, encrypted fake token storage, and Telegram owner connect-link action. Verified with `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
 - 2026-05-01: Re-verified M0-M3 against live Swiggy docs after tightening `AGENTS.md` documentation-review rules. Fetched live Swiggy auth, delegated-auth, Instamart overview, grocery recipe, errors, and all 13 Instamart tool markdown pages into `/private/tmp/flatmeal-swiggy-docs`. Confirmed M0 local tool contracts still match live tool names, endpoint, argument names, response envelopes, `spinId` guidance, `update_cart` replacement behavior, and checkout confirmation/payment guidance. Confirmed M3 fake OAuth mirrors documented PKCE S256, `/auth/authorize` and `/auth/token` shape, 120-second single-use authorization code, 5-day access token, no refresh-token issuance, no third-party OTP collection, and per-user delegated token storage. Verified with `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
+- 2026-05-01: Started M4 by re-reading local Swiggy contract docs and fetching live Swiggy docs for auth, delegated auth, Instamart overview, grocery recipe, errors, and all 13 Instamart tool pages into `/private/tmp/flatmeal-swiggy-docs-m4`. Confirmed implementation will start with contract tests before local MCP stub code.
+- 2026-05-01: Added M4 local Instamart MCP contract tests before implementation. Initial `npm test` failed as expected because `src/instamart/local-mcp-stub.ts` does not exist yet.
+- 2026-05-01: Completed M4 local Instamart MCP stub. Verified live Swiggy docs fetched into `/private/tmp/flatmeal-swiggy-docs-m4`, all 13 local tool handlers, strict argument validation, no auth credentials in tool arguments, `spinId` variants, full-cart replacement, checkout approval/stale/duplicate gates, uncertain-checkout `get_orders` branch, order details/tracking, sanitized `report_error`, and `/mcp/instamart` JSON-RPC route wiring. Verified with `npm test`, `npm run typecheck`, `npm run build`, and `git diff --check`.
 
 ## Commit / Push History
 
@@ -90,6 +99,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Agent created and pushed M2 Telegram onboarding update on `main` covering webhook intake, Telegram setup/language cards, role callbacks, cook language persistence, and this tracker.
 - 2026-05-01: Agent created and pushed M3 fake Swiggy OAuth update on `main` covering PKCE routes, owner-only connection start, encrypted fake token storage, Telegram owner connect links, and this tracker.
 - 2026-05-01: Agent created and pushed docs verification update on `main` covering stricter per-task live-doc review rules in `AGENTS.md` and M0-M3 live Swiggy verification in this tracker.
+- 2026-05-01: Agent created and pushed M4 local Instamart MCP stub update on `main` covering 13 contract-tested local tools, `/mcp/instamart` JSON-RPC route wiring, checkout safety gates, and this tracker.
 
 ## Milestone Update Template
 

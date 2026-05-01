@@ -1,6 +1,8 @@
 import express from "express";
 import type { AppEnv } from "./config/env.js";
 import { createSupabaseAdminClient } from "./database/supabase.js";
+import { LocalInstamartMcpStub } from "./instamart/local-mcp-stub.js";
+import { createInstamartMcpRouter } from "./instamart/mcp-router.js";
 import { createSwiggyOAuthRouter } from "./swiggy-oauth/routes.js";
 import { SwiggyOAuthService } from "./swiggy-oauth/service.js";
 import { SupabaseSwiggyOAuthRepository } from "./swiggy-oauth/supabase-repository.js";
@@ -14,6 +16,7 @@ export function createServer(env: AppEnv) {
   const telegramRepository = new SupabaseTelegramRepository(supabase);
   const swiggyOAuthRepository = new SupabaseSwiggyOAuthRepository(supabase);
   const swiggyOAuth = new SwiggyOAuthService(swiggyOAuthRepository, env);
+  const instamartMcpStub = new LocalInstamartMcpStub();
   const telegramBot = new TelegramBotApi(env.TELEGRAM_BOT_TOKEN);
   const telegramOnboarding = new TelegramOnboardingService(telegramRepository, {
     botUserId: env.TELEGRAM_BOT_TOKEN.split(":")[0],
@@ -42,6 +45,7 @@ export function createServer(env: AppEnv) {
   });
 
   app.use(createSwiggyOAuthRouter(swiggyOAuth, env));
+  app.use(createInstamartMcpRouter(instamartMcpStub));
 
   return app;
 }
