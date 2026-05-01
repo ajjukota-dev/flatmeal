@@ -51,6 +51,11 @@ export type TelegramAction =
       memberId: string;
     }
   | {
+      type: "send_swiggy_connect_link";
+      telegramUserId: string;
+      authUrl: string;
+    }
+  | {
       type: "answer_callback";
       callbackQueryId: string;
       text: string;

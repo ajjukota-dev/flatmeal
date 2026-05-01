@@ -17,6 +17,7 @@ export const envSchema = z.object({
   ENCRYPTION_SECRET: requiredSecret,
   FAKE_SWIGGY_OAUTH_BASE_URL: z.string().url(),
   FAKE_SWIGGY_OAUTH_CALLBACK_URL: z.string().url(),
+  FAKE_SWIGGY_CLIENT_ID: z.string().trim().min(1).default("flatmeal-local"),
   LOCAL_INSTAMART_MCP_URL: z.string().url(),
 });
 

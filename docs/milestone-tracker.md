@@ -4,9 +4,9 @@ Persistent progress tracker for coding agents. Update this file after every mean
 
 ## Current Milestone
 
-- **Current:** M3 — Fake Swiggy OAuth PKCE and encrypted household connection.
+- **Current:** M4 — Local Instamart MCP stub with all 13 contract-tested tools.
 - **Status:** Ready to start.
-- **Goal:** Add local fake Swiggy OAuth routes, PKCE state validation, encrypted token storage, expiry/reconnect state, and owner-only connection flow.
+- **Goal:** Write contract tests from the extracted Swiggy Instamart contracts, then implement the local MCP-compatible stub without inventing undocumented fields or workflow rules.
 
 ## Build Order
 
@@ -36,22 +36,28 @@ Persistent progress tracker for coding agents. Update this file after every mean
   - Added role callback handling with first-owner-wins protection.
   - Added cook language callback handling that requires an existing cook role.
   - Added direct Telegram Bot API sender for setup cards, language cards, and callback answers.
+- **M3 — Fake Swiggy OAuth PKCE and encrypted household connection.**
+  - Rechecked live Swiggy authentication and delegated-auth docs before implementation.
+  - Added fake OAuth authorize/callback/token flow with PKCE S256 state and code validation.
+  - Added owner-only Swiggy connect start checks backed by Supabase household membership.
+  - Added encrypted fake access-token storage in `swiggy_connections`.
+  - Added Telegram owner connect-link action after owner role selection.
 
 ## In Progress
 
-- M3 is ready to begin:
-  - Add fake OAuth authorize/callback/token routes.
-  - Store PKCE state and code verifier hashes in `oauth_sessions`.
-  - Encrypt fake access tokens before writing `swiggy_connections`.
-  - Add owner-only Swiggy connect checks for Telegram flow.
+- M4 is ready to begin:
+  - Write contract tests for all 13 Instamart tool names and local workflow gates.
+  - Implement only those local stub fields and branches already captured in `docs/swiggy-instamart-tool-contracts.md`.
+  - Keep checkout blocked behind latest explicit Telegram cart approval.
+  - Surface undocumented fields as `not specified by docs` in the contract docs rather than inventing shapes.
 
 ## Next Tasks
 
-1. Start M3 with fake OAuth PKCE unit tests.
-2. Implement fake Swiggy authorize/callback/token exchange routes.
-3. Add encrypted token storage and expiry state.
-4. Add Telegram owner-only connect action.
-5. Keep local Instamart tool behavior blocked until M4 contract tests exist.
+1. Re-open `docs/swiggy-instamart-tool-contracts.md` and map each completed tool section to one or more contract tests.
+2. Add local MCP stub contract tests for tool discovery, argument validation, response envelopes, and documented workflow gates.
+3. Implement the smallest local Instamart MCP stub that satisfies those tests.
+4. Add checkout safety tests for latest approval, stale revision rejection, and non-idempotent retry posture.
+5. Run contract tests plus TypeScript typecheck/build before moving to M5.
 
 ## Blockers
 
@@ -73,6 +79,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Completed M1 scaffold. Verified with `npm install`, `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
 - 2026-05-01: Applied Supabase migrations `initial_mvp_schema` and `add_mvp_foreign_key_indexes` through Supabase MCP. Verified 14 public MVP tables with RLS enabled via Supabase MCP `list_tables` and SQL query. Security advisor shows expected `rls_enabled_no_policy` info notices for backend-only service-role tables; it also reports pre-existing `public.rls_auto_enable()` SECURITY DEFINER execute warnings that were not created by this milestone. Performance advisor foreign-key warnings were fixed; remaining performance notices are unused-index info on the empty new schema.
 - 2026-05-01: Fetched live Telegram Bot API docs before M2 implementation. Completed Telegram onboarding slice with webhook intake, setup card sending, role callbacks, first-owner-wins protection, cook language persistence, Telegram sender tests, and Supabase repository boundary. Verified with `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
+- 2026-05-01: Fetched live Swiggy authentication and delegated-auth docs before M3 implementation. Completed fake Swiggy OAuth with PKCE S256 authorization URL generation, state/code validation, single-use code exchange, owner-only connection start, encrypted fake token storage, and Telegram owner connect-link action. Verified with `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
 
 ## Commit / Push History
 
@@ -80,6 +87,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Agent created and pushed a docs-only M0 completion update on `main` covering completed Swiggy Instamart per-tool contract gates in `docs/swiggy-instamart-tool-contracts.md` and this tracker.
 - 2026-05-01: Agent created and pushed M1 scaffold update on `main` covering TypeScript backend scaffold, env validation, Supabase migrations, initial contract-test scaffold, and this tracker.
 - 2026-05-01: Agent created and pushed M2 Telegram onboarding update on `main` covering webhook intake, Telegram setup/language cards, role callbacks, cook language persistence, and this tracker.
+- 2026-05-01: Agent created and pushed M3 fake Swiggy OAuth update on `main` covering PKCE routes, owner-only connection start, encrypted fake token storage, Telegram owner connect links, and this tracker.
 
 ## Milestone Update Template
 

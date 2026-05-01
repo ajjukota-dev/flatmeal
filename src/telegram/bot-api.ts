@@ -59,6 +59,14 @@ export class TelegramBotApi {
       return;
     }
 
+    if (action.type === "send_swiggy_connect_link") {
+      await this.sendMessage({
+        chat_id: action.telegramUserId,
+        text: `Connect Swiggy: ${action.authUrl}`,
+      });
+      return;
+    }
+
     await this.call("answerCallbackQuery", {
       callback_query_id: action.callbackQueryId,
       text: action.text,

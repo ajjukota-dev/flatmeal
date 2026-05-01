@@ -42,4 +42,23 @@ describe("TelegramBotApi", () => {
       }),
     ).rejects.toThrow("Telegram answerCallbackQuery failed: bad request");
   });
+
+  it("sends fake Swiggy connect links privately", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const bot = new TelegramBotApi("123:secret", async (url, init) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+      return Response.json({ ok: true, result: true });
+    });
+
+    await bot.dispatch({
+      type: "send_swiggy_connect_link",
+      telegramUserId: "42",
+      authUrl: "http://localhost:3000/swiggy/connect/start?householdId=hh&ownerMemberId=member",
+    });
+
+    expect(calls[0]?.body).toEqual({
+      chat_id: "42",
+      text: "Connect Swiggy: http://localhost:3000/swiggy/connect/start?householdId=hh&ownerMemberId=member",
+    });
+  });
 });

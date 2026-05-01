@@ -87,7 +87,7 @@ class InMemoryTelegramRepository implements TelegramOnboardingRepository {
 describe("TelegramOnboardingService", () => {
   it("creates a household and setup-card action when the bot is added to a group", async () => {
     const repository = new InMemoryTelegramRepository();
-    const service = new TelegramOnboardingService(repository, { botUserId: "999" });
+    const service = new TelegramOnboardingService(repository, { botUserId: "999", publicBaseUrl: "http://localhost:3000" });
 
     const result = await service.handleUpdate({
       update_id: 1,
@@ -107,7 +107,7 @@ describe("TelegramOnboardingService", () => {
 
   it("deduplicates repeated Telegram update ids", async () => {
     const repository = new InMemoryTelegramRepository();
-    const service = new TelegramOnboardingService(repository, { botUserId: "999" });
+    const service = new TelegramOnboardingService(repository, { botUserId: "999", publicBaseUrl: "http://localhost:3000" });
     const update = {
       update_id: 1,
       message: {
@@ -126,7 +126,7 @@ describe("TelegramOnboardingService", () => {
 
   it("uses first-owner-wins for role callbacks", async () => {
     const repository = new InMemoryTelegramRepository();
-    const service = new TelegramOnboardingService(repository, { botUserId: "999" });
+    const service = new TelegramOnboardingService(repository, { botUserId: "999", publicBaseUrl: "http://localhost:3000" });
     const message = { message_id: 20, chat: { id: -100, type: "group" as const } };
 
     await service.handleUpdate({
@@ -149,7 +149,7 @@ describe("TelegramOnboardingService", () => {
 
   it("stores cook language from callback data", async () => {
     const repository = new InMemoryTelegramRepository();
-    const service = new TelegramOnboardingService(repository, { botUserId: "999" });
+    const service = new TelegramOnboardingService(repository, { botUserId: "999", publicBaseUrl: "http://localhost:3000" });
     const message = { message_id: 20, chat: { id: -100, type: "group" as const } };
 
     await service.handleUpdate({
@@ -166,7 +166,7 @@ describe("TelegramOnboardingService", () => {
 
   it("rejects cook language callback before cook role is selected", async () => {
     const repository = new InMemoryTelegramRepository();
-    const service = new TelegramOnboardingService(repository, { botUserId: "999" });
+    const service = new TelegramOnboardingService(repository, { botUserId: "999", publicBaseUrl: "http://localhost:3000" });
     const message = { message_id: 20, chat: { id: -100, type: "group" as const } };
 
     const result = await service.handleUpdate({

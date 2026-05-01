@@ -4,6 +4,7 @@ import type { TelegramAction, TelegramMessage, TelegramUpdate } from "./types.js
 
 type OnboardingOptions = {
   botUserId: string;
+  publicBaseUrl: string;
 };
 
 export type TelegramUpdateResult = {
@@ -61,6 +62,17 @@ export class TelegramOnboardingService {
             text: `Role saved: ${intent.role}.`,
           },
         ];
+
+        if (intent.role === "owner") {
+          const authUrl = new URL("/swiggy/connect/start", this.options.publicBaseUrl);
+          authUrl.searchParams.set("householdId", chat.householdId);
+          authUrl.searchParams.set("ownerMemberId", member.id);
+          actions.push({
+            type: "send_swiggy_connect_link",
+            telegramUserId: user.telegramUserId,
+            authUrl: authUrl.toString(),
+          });
+        }
 
         if (intent.role === "cook") {
           actions.push({

@@ -15,6 +15,7 @@ const validEnv = {
   ENCRYPTION_SECRET: "local-dev-secret",
   FAKE_SWIGGY_OAUTH_BASE_URL: "http://localhost:3001/fake-swiggy",
   FAKE_SWIGGY_OAUTH_CALLBACK_URL: "http://localhost:3001/oauth/swiggy/callback",
+  FAKE_SWIGGY_CLIENT_ID: "flatmeal-local",
   LOCAL_INSTAMART_MCP_URL: "http://localhost:3001/mcp/instamart",
 };
 
