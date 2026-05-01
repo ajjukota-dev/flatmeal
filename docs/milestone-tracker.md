@@ -120,6 +120,8 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Agent created and pushed a docs-only tracker follow-up on `main` recording the M5 smoke verification push state.
 - 2026-05-01: Agent created and pushed M5 workflow commit `62289c7` on `main` covering Telegram text/voice message workflow, `voice_assets` STT persistence, `agent_runs` persistence, cook prompt text/voice actions, and this tracker.
 - 2026-05-01: Agent created and pushed a docs-only tracker follow-up on `main` recording the M5 workflow push state.
+- 2026-05-01: Agent created and pushed live-smoke fix commit `eaa55b3` on `main` covering empty optional OpenAI clarification fields and this tracker.
+- 2026-05-01: Agent created and pushed a docs-only tracker follow-up on `main` recording the live-smoke fix push state.
 
 ## Milestone Update Template
 
