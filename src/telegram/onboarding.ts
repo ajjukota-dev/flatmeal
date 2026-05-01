@@ -34,6 +34,26 @@ export class TelegramOnboardingService {
       const chat = await this.repository.ensureHouseholdForChat(update.callback_query.message.chat);
       const user = await this.repository.upsertTelegramUser(update.callback_query.from);
 
+      if (intent.type === "approve_cart") {
+        const member = await this.repository.findHouseholdMember({
+          householdId: chat.householdId,
+          telegramUserId: user.id,
+        });
+        return {
+          duplicate: false,
+          actions:
+            this.messageWorkflow
+              ? await this.messageWorkflow.handleCartApproval({
+                  chat,
+                  member,
+                  callbackQueryId: update.callback_query.id,
+                  cartSessionId: intent.cartSessionId,
+                  revision: intent.revision,
+                })
+              : [],
+        };
+      }
+
       if (intent.type === "select_role") {
         if (intent.role === "owner") {
           const existingOwner = await this.repository.findOwnerMember(chat.householdId);

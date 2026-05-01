@@ -1,6 +1,8 @@
 import type { Agent } from "@openai/agents";
 import { describe, expect, it } from "vitest";
 import { OpenAISpecialistAgents, type SpecialistAgentRunOptions, type StructuredAgentRunner } from "../agents/specialists.js";
+import { encryptSecret } from "../crypto/secrets.js";
+import { LocalInstamartMcpStub } from "../instamart/local-mcp-stub.js";
 import type {
   SpeechToTextProvider,
   TextToSpeechInput,
@@ -12,10 +14,14 @@ import type {
 import { TelegramMessageWorkflowService, type TelegramVoiceDownloader } from "./message-workflow.js";
 import type {
   AgentRunInsert,
+  CartItemInsert,
   MessageEventInsert,
+  OrderInsert,
+  StoredCartSession,
   StoredCookMember,
   StoredHouseholdChat,
   StoredHouseholdMember,
+  StoredSwiggyConnection,
   StoredTelegramUser,
   TelegramOnboardingRepository,
   VoiceAssetInsert,
@@ -75,6 +81,10 @@ class FakeRepository implements TelegramOnboardingRepository {
   };
   voiceAssets: Array<{ id: string; telegramFileId: string; status: string; transcript?: string; languageCode?: string | null }> = [];
   agentRuns: Array<AgentRunInsert & { id: string; status: string; sanitizedOutput?: Record<string, unknown>; intent?: string }> = [];
+  swiggyConnection: StoredSwiggyConnection | null = null;
+  cartSessions: StoredCartSession[] = [];
+  cartItems: Array<CartItemInsert & { cartSessionId: string; revision: number }> = [];
+  orders: OrderInsert[] = [];
 
   async recordMessageEvent(_input: MessageEventInsert): Promise<{ id?: string; duplicate: boolean }> {
     return { id: "message-event-1", duplicate: false };
@@ -154,6 +164,75 @@ class FakeRepository implements TelegramOnboardingRepository {
       run.sanitizedOutput = { errorSummary: input.errorSummary };
     }
   }
+
+  async findActiveSwiggyConnection(_householdId: string): Promise<StoredSwiggyConnection | null> {
+    return this.swiggyConnection;
+  }
+
+  async createCartSession(input: {
+    householdId: string;
+    swiggyConnectionId: string;
+    selectedAddressId: string;
+  }): Promise<StoredCartSession> {
+    const session: StoredCartSession = {
+      id: `cart-${this.cartSessions.length + 1}`,
+      householdId: input.householdId,
+      swiggyConnectionId: input.swiggyConnectionId,
+      status: "building",
+      revision: 1,
+      selectedAddressId: input.selectedAddressId,
+    };
+    this.cartSessions.push(session);
+    return session;
+  }
+
+  async replaceCartItems(input: { cartSessionId: string; revision: number; items: CartItemInsert[] }): Promise<void> {
+    this.cartItems = this.cartItems.filter(
+      (item) => item.cartSessionId !== input.cartSessionId || item.revision !== input.revision,
+    );
+    this.cartItems.push(...input.items.map((item) => ({ ...item, cartSessionId: input.cartSessionId, revision: input.revision })));
+  }
+
+  async markCartApprovalPending(input: { cartSessionId: string; revision: number }): Promise<void> {
+    const session = this.cartSessions.find((candidate) => candidate.id === input.cartSessionId && candidate.revision === input.revision);
+    if (session) {
+      session.status = "approval_pending";
+    }
+  }
+
+  async findCartSession(cartSessionId: string): Promise<StoredCartSession | null> {
+    return this.cartSessions.find((session) => session.id === cartSessionId) ?? null;
+  }
+
+  async findActiveCartSession(householdId: string): Promise<StoredCartSession | null> {
+    return this.cartSessions.find(
+      (session) => session.householdId === householdId && ["building", "upsell_open", "approval_pending"].includes(session.status),
+    ) ?? null;
+  }
+
+  async approveCartSession(input: { cartSessionId: string; revision: number; approvedByMemberId: string }): Promise<StoredCartSession | null> {
+    const session = this.cartSessions.find(
+      (candidate) =>
+        candidate.id === input.cartSessionId && candidate.revision === input.revision && candidate.status === "approval_pending",
+    );
+    if (!session) {
+      return null;
+    }
+    session.status = "approved";
+    return session;
+  }
+
+  async markCartCheckedOut(cartSessionId: string): Promise<void> {
+    const session = this.cartSessions.find((candidate) => candidate.id === cartSessionId);
+    if (session) {
+      session.status = "checked_out";
+    }
+  }
+
+  async recordOrder(input: OrderInsert): Promise<{ id: string }> {
+    this.orders.push(input);
+    return { id: `order-row-${this.orders.length}` };
+  }
 }
 
 const chat: StoredHouseholdChat = { id: "chat-row", householdId: "household-1", telegramChatId: "-100" };
@@ -220,7 +299,7 @@ describe("TelegramMessageWorkflowService", () => {
     expect(runner.calls.every((call) => call.options.traceIncludeSensitiveData === false)).toBe(true);
   });
 
-  it("downloads voice, stores STT transcript, extracts cook missing items, and stops before cart build", async () => {
+  it("downloads voice, stores STT transcript, extracts cook missing items, and stops before cart build when M6 is not configured", async () => {
     const repository = new FakeRepository();
     const speech = new FakeSpeechProvider();
     speech.transcriptions.push({ requestId: "stt-1", transcript: "chawal khatam hai", languageCode: "hi-IN" });
@@ -273,6 +352,152 @@ describe("TelegramMessageWorkflowService", () => {
       },
     ]);
     expect(repository.agentRuns.map((run) => run.agentName)).toEqual(["message_intent_agent", "missing_items_agent"]);
+  });
+
+  it("builds a revisioned Instamart cart from cook missing items and sends approval card", async () => {
+    const repository = new FakeRepository();
+    const encryptionSecret = "m6-secret";
+    repository.swiggyConnection = {
+      id: "swiggy-connection-1",
+      encryptedAccessToken: encryptSecret("fake-swiggy-token", encryptionSecret),
+    };
+    const speech = new FakeSpeechProvider();
+    const runner = new FakeRunner([
+      {
+        intent: "cook_restock_request",
+        confidence: 0.91,
+        language: "hinglish",
+        reason: "Cook reported missing grocery.",
+        requiresClarification: false,
+      },
+      { items: [{ name: "rice", quantity: 1, unit: "kg", confidence: 0.9 }], requiresClarification: false },
+      {
+        addressId: "addr_home",
+        items: [{ requestedName: "rice", searchQuery: "rice", selectedSpinId: "spin_rice_1kg", quantity: 1 }],
+      },
+    ]);
+    const workflow = new TelegramMessageWorkflowService(
+      repository,
+      new OpenAISpecialistAgents({ runner }),
+      speech,
+      speech,
+      new FakeVoiceDownloader(),
+      { instamartClient: new LocalInstamartMcpStub(), encryptionSecret },
+    );
+
+    const actions = await workflow.handleMessage({
+      chat,
+      member: { id: "member-cook", householdId: "household-1", telegramUserId: "user-cook", role: "cook" },
+      messageEventId: "message-event-3",
+      message: textMessage("chawal khatam hai"),
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        type: "send_cart_approval_card",
+        chatId: "-100",
+        cartSessionId: "cart-1",
+        revision: 1,
+        text: expect.stringContaining("Instamart cart revision 1"),
+      }),
+    ]);
+    expect(repository.cartSessions[0]).toMatchObject({
+      id: "cart-1",
+      status: "approval_pending",
+      selectedAddressId: "addr_home",
+    });
+    expect(repository.cartItems).toEqual([
+      expect.objectContaining({
+        cartSessionId: "cart-1",
+        revision: 1,
+        requestedName: "rice",
+        selectedProductName: "Sona Masoori Rice 1 kg",
+        spinId: "spin_rice_1kg",
+        quantity: 1,
+      }),
+    ]);
+    expect(repository.agentRuns.map((run) => run.agentName)).toEqual([
+      "message_intent_agent",
+      "missing_items_agent",
+      "cart_planner_agent",
+    ]);
+  });
+
+  it("rejects stale approval callbacks and checks out only the latest revision", async () => {
+    const repository = new FakeRepository();
+    const encryptionSecret = "m6-secret";
+    repository.swiggyConnection = {
+      id: "swiggy-connection-1",
+      encryptedAccessToken: encryptSecret("fake-swiggy-token", encryptionSecret),
+    };
+    repository.cartSessions.push({
+      id: "cart-1",
+      householdId: "household-1",
+      swiggyConnectionId: "swiggy-connection-1",
+      status: "approval_pending",
+      revision: 2,
+      selectedAddressId: "addr_home",
+    });
+    const stub = new LocalInstamartMcpStub();
+    await stub.callTool({
+      name: "update_cart",
+      arguments: { selectedAddressId: "addr_home", items: [{ spinId: "spin_rice_1kg", quantity: 1 }] },
+      context: { accessToken: "fake-swiggy-token" },
+    });
+    const workflow = new TelegramMessageWorkflowService(
+      repository,
+      new OpenAISpecialistAgents({ runner: new FakeRunner([]) }),
+      new FakeSpeechProvider(),
+      new FakeSpeechProvider(),
+      new FakeVoiceDownloader(),
+      { instamartClient: stub, encryptionSecret },
+    );
+
+    await expect(
+      workflow.handleCartApproval({
+        chat,
+        member: { id: "member-flatmate", householdId: "household-1", telegramUserId: "user-flatmate", role: "flatmate" },
+        callbackQueryId: "cb-stale",
+        cartSessionId: "cart-1",
+        revision: 1,
+      }),
+    ).resolves.toEqual([
+      {
+        type: "answer_callback",
+        callbackQueryId: "cb-stale",
+        text: "This approval button is stale. Please approve the latest cart.",
+      },
+    ]);
+
+    const actions = await workflow.handleCartApproval({
+      chat,
+      member: { id: "member-flatmate", householdId: "household-1", telegramUserId: "user-flatmate", role: "flatmate" },
+      callbackQueryId: "cb-ok",
+      cartSessionId: "cart-1",
+      revision: 2,
+    });
+
+    expect(actions).toEqual([
+      {
+        type: "answer_callback",
+        callbackQueryId: "cb-ok",
+        text: "Cart approved. Checkout completed.",
+      },
+      {
+        type: "send_text_message",
+        chatId: "-100",
+        text: expect.stringContaining("Instamart order placed successfully"),
+      },
+    ]);
+    expect(repository.cartSessions[0]?.status).toBe("checked_out");
+    expect(repository.orders).toEqual([
+      expect.objectContaining({
+        cartSessionId: "cart-1",
+        swiggyConnectionId: "swiggy-connection-1",
+        swiggyOrderId: "IM-000001",
+        status: "confirmed",
+      }),
+    ]);
   });
 });
 

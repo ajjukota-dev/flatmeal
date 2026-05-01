@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { TelegramOnboardingService } from "./onboarding.js";
 import type {
+  CartItemInsert,
   MessageEventInsert,
+  OrderInsert,
+  StoredCartSession,
   StoredHouseholdChat,
   StoredHouseholdMember,
+  StoredSwiggyConnection,
   StoredTelegramUser,
   TelegramOnboardingRepository,
   AgentRunInsert,
@@ -105,6 +109,40 @@ class InMemoryTelegramRepository implements TelegramOnboardingRepository {
   async completeAgentRun(_input: { id: string; intent?: string; sanitizedOutput: Record<string, unknown> }): Promise<void> {}
 
   async failAgentRun(_input: { id: string; errorSummary: string }): Promise<void> {}
+
+  async findActiveSwiggyConnection(_householdId: string): Promise<StoredSwiggyConnection | null> {
+    return null;
+  }
+
+  async createCartSession(_input: {
+    householdId: string;
+    swiggyConnectionId: string;
+    selectedAddressId: string;
+  }): Promise<StoredCartSession> {
+    throw new Error("not implemented in onboarding test repository");
+  }
+
+  async replaceCartItems(_input: { cartSessionId: string; revision: number; items: CartItemInsert[] }): Promise<void> {}
+
+  async markCartApprovalPending(_input: { cartSessionId: string; revision: number; approvalMessageId?: string }): Promise<void> {}
+
+  async findCartSession(_cartSessionId: string): Promise<StoredCartSession | null> {
+    return null;
+  }
+
+  async findActiveCartSession(_householdId: string): Promise<StoredCartSession | null> {
+    return null;
+  }
+
+  async approveCartSession(_input: { cartSessionId: string; revision: number; approvedByMemberId: string }): Promise<StoredCartSession | null> {
+    return null;
+  }
+
+  async markCartCheckedOut(_cartSessionId: string): Promise<void> {}
+
+  async recordOrder(_input: OrderInsert): Promise<{ id: string }> {
+    return { id: "order-row-1" };
+  }
 }
 
 describe("TelegramOnboardingService", () => {

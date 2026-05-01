@@ -79,6 +79,35 @@ describe("TelegramBotApi", () => {
     ]);
   });
 
+  it("sends cart approval cards with revisioned callback data", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const bot = new TelegramBotApi("123:secret", async (url, init) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+      return Response.json({ ok: true, result: true });
+    });
+
+    await bot.dispatch({
+      type: "send_cart_approval_card",
+      chatId: "-100",
+      text: "Cart revision 2",
+      cartSessionId: "cart-1",
+      revision: 2,
+    });
+
+    expect(calls).toEqual([
+      {
+        url: "https://api.telegram.org/bot123:secret/sendMessage",
+        body: {
+          chat_id: "-100",
+          text: "Cart revision 2",
+          reply_markup: {
+            inline_keyboard: [[{ text: "Approve cart", callback_data: "fm:cart:approve:cart-1:2" }]],
+          },
+        },
+      },
+    ]);
+  });
+
   it("downloads Telegram voice files through getFile file_path", async () => {
     const calls: Array<{ url: string; body?: unknown }> = [];
     const bot = new TelegramBotApi("123:secret", async (url, init) => {

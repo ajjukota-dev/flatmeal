@@ -5,7 +5,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 ## Current Milestone
 
 - **Current:** M6 — Cart build, add-more window, approval revisioning, checkout simulation.
-- **Status:** Ready to start.
+- **Status:** In progress.
 - **Goal:** Build carts from extracted missing items through the local Instamart MCP stub, present revisioned Telegram cart approval, and simulate checkout only after latest explicit owner/flatmate approval.
 
 ## Build Order
@@ -57,18 +57,17 @@ Persistent progress tracker for coding agents. Update this file after every mean
 
 ## In Progress
 
-- M6 is ready to start:
-  - Cart build must use the local Instamart MCP stub and extracted Swiggy tool contracts.
-  - Approval callbacks must include `cartSessionId` and `revision`.
+- M6 is in progress:
+  - Implemented cook missing-items → local Instamart cart build → Supabase cart session/items → revisioned Telegram approval card.
+  - Implemented approval callbacks containing `cartSessionId` and `revision`, stale approval rejection, owner/flatmate approval checks, latest `get_cart` re-read, guarded checkout, order persistence, and initial `track_order`.
   - Supabase remains authoritative for cart truth, approval state, OAuth state, selected address, and order state.
+  - Remaining M6 work: timed add-more/free-delivery window and cart-addition revision rebuild.
 
 ## Next Tasks
 
-1. Re-fetch relevant live Swiggy docs for `get_addresses`, `search_products`, `update_cart`, `get_cart`, `checkout`, and `track_order`.
-2. Add cart-session repository/state transition tests for selected address, revision, approval pending, latest approval, stale approval rejection, and duplicate checkout prevention.
-3. Implement cart build from `missing_items_agent` output through allowed local MCP tools only.
-4. Add Telegram cart preview with approval callback data containing `cartSessionId` and `revision`.
-5. Verify with focused cart/approval tests, Instamart trajectory tests, `npm run smoke:m5`, `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
+1. Implement timed add-more/free-delivery window with `upsell_open` state, flatmate/owner addition handling, full-cart replacement, and revision increment.
+2. Add M6 smoke script for cook restock → approval card → approval callback → checkout simulation.
+3. Verify with focused cart/approval tests, Instamart trajectory tests, `npm run smoke:m5`, `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
 
 ## Blockers
 
@@ -105,6 +104,9 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Completed remaining M5 Telegram message workflow after re-reading local docs and fetching current OpenAI Agents SDK, Sarvam STT/TTS, Telegram Bot API, and Supabase RLS docs. Added backend-owned text/voice message handling, incoming voice STT persistence in `voice_assets`, OpenAI specialist run persistence in `agent_runs`, Sarvam TTS cook voice-note generation, Telegram text/voice workflow actions, and server wiring. Verified with `npm test -- src/telegram/message-workflow.test.ts src/telegram/onboarding.test.ts src/telegram/bot-api.test.ts`, `npm run typecheck`, `npm test` (11 files / 45 tests), `npm run build`, `npm run smoke:m5`, gated live smoke skips for OpenAI/Sarvam/Telegram, `git diff --check`, and Supabase MCP SQL confirming `message_events`, `voice_assets`, and `agent_runs` columns with RLS enabled.
 - 2026-05-01: Live M5 smoke check found OpenAI can return an empty optional `clarificationQuestion` when `requiresClarification=false`; updated intent and missing-items schemas to tolerate empty optional clarification fields while backend workflow still only acts on non-empty clarification text. Verified with `npm test -- src/agents/schemas.test.ts src/telegram/message-workflow.test.ts`, `npm run typecheck`, `RUN_LIVE_OPENAI_SMOKE=true npm run smoke:m5:openai`, `RUN_LIVE_SARVAM_SMOKE=true npm run smoke:m5:sarvam` (TTS passed; STT skipped without `SARVAM_STT_AUDIO_PATH`), `RUN_LIVE_TELEGRAM_SMOKE=true npm run smoke:m5:telegram` (blocked because `TELEGRAM_BOT_TOKEN` is not set), `npm test`, `npm run build`, and `npm run smoke:m5`.
 - 2026-05-01: Added gated live Telegram voice-note STT smoke after rechecking Telegram Bot API and Sarvam STT docs. The new `npm run smoke:m5:telegram-voice` polls for a fresh Telegram voice message, downloads it through `getFile`, and sends that voice file to Sarvam STT. Verified with `npm test -- src/telegram/bot-api.test.ts src/speech/sarvam.test.ts`, `npm run typecheck`, `npm run build`, disabled smoke skip, and `RUN_LIVE_TELEGRAM_VOICE_SMOKE=true npm run smoke:m5:telegram-voice` using a private-chat Telegram voice note. Telegram `getMe` also passed; `can_read_all_group_messages=false`, so group-message privacy mode still needs to be disabled in BotFather before the full group demo.
+- 2026-05-02: Verified Telegram group webhook intake for supergroup `-1003918202790` (`Pegasus Food`) with the dev server and public tunnel running. Supabase `message_events` contains fresh text and voice rows for the supergroup. Voice stopped at intake because group roles are not selected yet, which is expected before the M6 workflow demo.
+- 2026-05-02: Started M6 by re-reading local product, agent architecture, Swiggy observability, Swiggy contract, and milestone docs. Re-fetched live Swiggy docs for `get_addresses`, `search_products`, `update_cart`, `get_cart`, `checkout`, `get_orders`, `track_order`, auth, delegated auth, errors, and the order-groceries recipe into `/private/tmp/flatmeal-swiggy-docs-m6`. Confirmed M6 must preserve `get_addresses → search_products → update_cart → get_cart → checkout → track_order`, variant `spinId`, full-cart replacement, payment-method display from `get_cart`, explicit approval before `checkout`, `get_orders` check before retry after uncertain checkout, and 10s minimum `track_order` polling.
+- 2026-05-02: Implemented M6 core cart/approval/checkout path. Added revisioned cart approval callback data, Telegram approval card sending, Supabase cart/session/order repository methods, cook missing-items cart build through `get_addresses`, `search_products`, `update_cart`, and `get_cart`, persisted cart items from local cart truth, stale approval rejection, owner/flatmate approval checks, checkout `get_cart` re-read, guarded `checkout`, order persistence, and initial `track_order`. Verified with `npm test -- src/telegram/callback-data.test.ts src/telegram/bot-api.test.ts src/telegram/message-workflow.test.ts src/telegram/onboarding.test.ts`, `npm run typecheck`, `npm test` (12 files / 50 tests), `npm run build`, `npm run smoke:m5` with escalation for tsx IPC, and `git diff --check`. Remaining M6 work is the timed add-more/free-delivery window and cart-addition revision rebuild.
 
 ## Commit / Push History
 

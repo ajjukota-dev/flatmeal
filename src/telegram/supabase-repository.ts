@@ -1,10 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   AgentRunInsert,
+  CartItemInsert,
   MessageEventInsert,
+  OrderInsert,
+  StoredCartSession,
   StoredHouseholdChat,
   StoredCookMember,
   StoredHouseholdMember,
+  StoredSwiggyConnection,
   StoredTelegramUser,
   TelegramOnboardingRepository,
   VoiceAssetInsert,
@@ -319,6 +323,190 @@ export class SupabaseTelegramRepository implements TelegramOnboardingRepository 
       throw result.error;
     }
   }
+
+  async findActiveSwiggyConnection(householdId: string): Promise<StoredSwiggyConnection | null> {
+    const result = await this.supabase
+      .from("swiggy_connections")
+      .select("id, encrypted_access_token")
+      .eq("household_id", householdId)
+      .eq("status", "connected")
+      .gt("token_expires_at", new Date().toISOString())
+      .maybeSingle();
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    if (!result.data?.encrypted_access_token) {
+      return null;
+    }
+
+    return {
+      id: result.data.id,
+      encryptedAccessToken: result.data.encrypted_access_token,
+    };
+  }
+
+  async createCartSession(input: {
+    householdId: string;
+    swiggyConnectionId: string;
+    selectedAddressId: string;
+  }): Promise<StoredCartSession> {
+    const result = await this.supabase
+      .from("cart_sessions")
+      .insert({
+        household_id: input.householdId,
+        swiggy_connection_id: input.swiggyConnectionId,
+        selected_address_id: input.selectedAddressId,
+        status: "building",
+        revision: 1,
+      })
+      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id")
+      .single();
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    return toStoredCartSession(result.data);
+  }
+
+  async replaceCartItems(input: { cartSessionId: string; revision: number; items: CartItemInsert[] }): Promise<void> {
+    const deleteResult = await this.supabase
+      .from("cart_items")
+      .delete()
+      .eq("cart_session_id", input.cartSessionId)
+      .eq("revision", input.revision);
+
+    if (deleteResult.error) {
+      throw deleteResult.error;
+    }
+
+    if (input.items.length === 0) {
+      return;
+    }
+
+    const insertResult = await this.supabase.from("cart_items").insert(
+      input.items.map((item) => ({
+        cart_session_id: input.cartSessionId,
+        revision: input.revision,
+        requested_name: item.requestedName,
+        selected_product_name: item.selectedProductName,
+        spin_id: item.spinId,
+        quantity: item.quantity,
+        unit: item.unit,
+        price_minor: item.priceMinor,
+      })),
+    );
+
+    if (insertResult.error) {
+      throw insertResult.error;
+    }
+  }
+
+  async markCartApprovalPending(input: { cartSessionId: string; revision: number; approvalMessageId?: string }): Promise<void> {
+    const result = await this.supabase
+      .from("cart_sessions")
+      .update({
+        status: "approval_pending",
+        approval_message_id: input.approvalMessageId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.cartSessionId)
+      .eq("revision", input.revision);
+
+    if (result.error) {
+      throw result.error;
+    }
+  }
+
+  async findCartSession(cartSessionId: string): Promise<StoredCartSession | null> {
+    const result = await this.supabase
+      .from("cart_sessions")
+      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id")
+      .eq("id", cartSessionId)
+      .maybeSingle();
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    return result.data ? toStoredCartSession(result.data) : null;
+  }
+
+  async findActiveCartSession(householdId: string): Promise<StoredCartSession | null> {
+    const result = await this.supabase
+      .from("cart_sessions")
+      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id")
+      .eq("household_id", householdId)
+      .in("status", ["building", "upsell_open", "approval_pending"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    return result.data ? toStoredCartSession(result.data) : null;
+  }
+
+  async approveCartSession(input: { cartSessionId: string; revision: number; approvedByMemberId: string }): Promise<StoredCartSession | null> {
+    const result = await this.supabase
+      .from("cart_sessions")
+      .update({
+        status: "approved",
+        approved_by_member_id: input.approvedByMemberId,
+        approved_revision: input.revision,
+        approved_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.cartSessionId)
+      .eq("revision", input.revision)
+      .eq("status", "approval_pending")
+      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id")
+      .maybeSingle();
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    return result.data ? toStoredCartSession(result.data) : null;
+  }
+
+  async markCartCheckedOut(cartSessionId: string): Promise<void> {
+    const result = await this.supabase
+      .from("cart_sessions")
+      .update({ status: "checked_out", updated_at: new Date().toISOString() })
+      .eq("id", cartSessionId);
+
+    if (result.error) {
+      throw result.error;
+    }
+  }
+
+  async recordOrder(input: OrderInsert): Promise<{ id: string }> {
+    const result = await this.supabase
+      .from("orders")
+      .insert({
+        household_id: input.householdId,
+        cart_session_id: input.cartSessionId,
+        swiggy_connection_id: input.swiggyConnectionId,
+        local_order_id: input.localOrderId,
+        swiggy_order_id: input.swiggyOrderId,
+        status: input.status,
+        total_minor: input.totalMinor,
+        tracking_state: input.trackingState,
+      })
+      .select("id")
+      .single<RowId>();
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    return { id: result.data.id };
+  }
 }
 
 function toStoredMember(row: {
@@ -332,5 +520,23 @@ function toStoredMember(row: {
     householdId: row.household_id,
     telegramUserId: row.telegram_user_id,
     role: row.role,
+  };
+}
+
+function toStoredCartSession(row: {
+  id: string;
+  household_id: string;
+  swiggy_connection_id: string | null;
+  status: StoredCartSession["status"];
+  revision: number;
+  selected_address_id: string | null;
+}): StoredCartSession {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    swiggyConnectionId: row.swiggy_connection_id,
+    status: row.status,
+    revision: row.revision,
+    selectedAddressId: row.selected_address_id,
   };
 }

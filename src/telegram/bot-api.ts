@@ -1,4 +1,4 @@
-import { cookLanguageCallbackData, roleCallbackData } from "./callback-data.js";
+import { cartApprovalCallbackData, cookLanguageCallbackData, roleCallbackData } from "./callback-data.js";
 import type { TelegramAction } from "./types.js";
 
 type TelegramApiResponse<T> = {
@@ -96,6 +96,27 @@ export class TelegramBotApi {
       await this.sendMessage({
         chat_id: action.chatId,
         text: action.text,
+      });
+      return;
+    }
+
+    if (action.type === "send_cart_approval_card") {
+      await this.sendMessage({
+        chat_id: action.chatId,
+        text: action.text,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "Approve cart",
+                callback_data: cartApprovalCallbackData({
+                  cartSessionId: action.cartSessionId,
+                  revision: action.revision,
+                }),
+              },
+            ],
+          ],
+        },
       });
       return;
     }

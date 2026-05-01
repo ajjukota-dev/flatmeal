@@ -48,6 +48,40 @@ export type AgentRunInsert = {
   sanitizedInput: Record<string, unknown>;
 };
 
+export type StoredSwiggyConnection = {
+  id: string;
+  encryptedAccessToken: string;
+};
+
+export type StoredCartSession = {
+  id: string;
+  householdId: string;
+  swiggyConnectionId: string | null;
+  status: "building" | "upsell_open" | "approval_pending" | "approved" | "checked_out" | "expired" | "failed";
+  revision: number;
+  selectedAddressId: string | null;
+};
+
+export type CartItemInsert = {
+  requestedName: string;
+  selectedProductName?: string;
+  spinId: string;
+  quantity: number;
+  unit?: string;
+  priceMinor?: number;
+};
+
+export type OrderInsert = {
+  householdId: string;
+  cartSessionId: string;
+  swiggyConnectionId?: string | null;
+  localOrderId: string;
+  swiggyOrderId?: string;
+  status: "created" | "confirmed" | "tracking" | "delivered" | "failed";
+  totalMinor?: number;
+  trackingState: Record<string, unknown>;
+};
+
 export interface TelegramOnboardingRepository {
   recordMessageEvent(input: MessageEventInsert): Promise<{ id?: string; duplicate: boolean }>;
   ensureHouseholdForChat(chat: TelegramChat): Promise<StoredHouseholdChat>;
@@ -70,4 +104,17 @@ export interface TelegramOnboardingRepository {
   createAgentRun(input: AgentRunInsert): Promise<{ id: string }>;
   completeAgentRun(input: { id: string; intent?: string; sanitizedOutput: Record<string, unknown> }): Promise<void>;
   failAgentRun(input: { id: string; errorSummary: string }): Promise<void>;
+  findActiveSwiggyConnection(householdId: string): Promise<StoredSwiggyConnection | null>;
+  createCartSession(input: {
+    householdId: string;
+    swiggyConnectionId: string;
+    selectedAddressId: string;
+  }): Promise<StoredCartSession>;
+  replaceCartItems(input: { cartSessionId: string; revision: number; items: CartItemInsert[] }): Promise<void>;
+  markCartApprovalPending(input: { cartSessionId: string; revision: number; approvalMessageId?: string }): Promise<void>;
+  findCartSession(cartSessionId: string): Promise<StoredCartSession | null>;
+  findActiveCartSession(householdId: string): Promise<StoredCartSession | null>;
+  approveCartSession(input: { cartSessionId: string; revision: number; approvedByMemberId: string }): Promise<StoredCartSession | null>;
+  markCartCheckedOut(cartSessionId: string): Promise<void>;
+  recordOrder(input: OrderInsert): Promise<{ id: string }>;
 }

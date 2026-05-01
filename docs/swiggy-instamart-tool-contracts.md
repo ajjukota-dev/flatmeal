@@ -1,6 +1,6 @@
 # Swiggy Instamart Tool Contracts
 
-Last checked: 2026-05-01.
+Last checked: 2026-05-02.
 
 This file is the local contract extraction for Flatmeal’s Swiggy Instamart MCP stub and adapter. It should be updated only after checking the live Swiggy docs.
 
@@ -225,7 +225,7 @@ Tool sections below are the implementation gate. A Swiggy tool may be implemente
 ### `get_addresses`
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/get_addresses/
-- Last checked: 2026-05-01.
+- Last checked: 2026-05-02.
 - Tool name: `get_addresses`.
 - MCP server: Instamart.
 - Endpoint: `POST mcp.swiggy.com/im`.
@@ -271,7 +271,7 @@ Shared note: `search_products` and `your_go_to_items` both return products with 
 ### `search_products`
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/search_products/
-- Last checked: 2026-05-01.
+- Last checked: 2026-05-02.
 - Tool name: `search_products`.
 - MCP server: Instamart.
 - Endpoint: `POST mcp.swiggy.com/im`.
@@ -381,7 +381,7 @@ Shared note: `search_products` and `your_go_to_items` both return products with 
 ### `update_cart`
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/update_cart/
-- Last checked: 2026-05-01.
+- Last checked: 2026-05-02.
 - Tool name: `update_cart`.
 - MCP server: Instamart.
 - Endpoint: `POST mcp.swiggy.com/im`.
@@ -423,7 +423,7 @@ Shared note: `search_products` and `your_go_to_items` both return products with 
 ### `get_cart`
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/get_cart/
-- Last checked: 2026-05-01.
+- Last checked: 2026-05-02.
 - Tool name: `get_cart`.
 - MCP server: Instamart.
 - Endpoint: `POST mcp.swiggy.com/im`.
@@ -464,7 +464,7 @@ Shared note: `search_products` and `your_go_to_items` both return products with 
 ### `checkout`
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/checkout/
-- Last checked: 2026-05-01.
+- Last checked: 2026-05-02.
 - Tool name: `checkout`.
 - MCP server: Instamart.
 - Endpoint: `POST mcp.swiggy.com/im`.
@@ -562,7 +562,7 @@ Shared note: `search_products` and `your_go_to_items` both return products with 
 ### `get_orders`
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/get_orders/
-- Last checked: 2026-05-01.
+- Last checked: 2026-05-02.
 - Tool name: `get_orders`.
 - MCP server: Instamart.
 - Endpoint: `POST mcp.swiggy.com/im`.
@@ -608,7 +608,7 @@ Shared note: `search_products` and `your_go_to_items` both return products with 
 ### `track_order`
 
 - Source URL checked: https://mcp.swiggy.com/builders/docs/reference/instamart/track_order/
-- Last checked: 2026-05-01.
+- Last checked: 2026-05-02.
 - Tool name: `track_order`.
 - MCP server: Instamart.
 - Endpoint: `POST mcp.swiggy.com/im`.

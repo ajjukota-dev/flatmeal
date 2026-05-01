@@ -61,6 +61,13 @@ export type TelegramAction =
       text: string;
     }
   | {
+      type: "send_cart_approval_card";
+      chatId: string;
+      text: string;
+      cartSessionId: string;
+      revision: number;
+    }
+  | {
       type: "send_voice_note";
       chatId: string;
       voice: Blob;

@@ -29,6 +29,10 @@ export function createServer(env: AppEnv) {
     sarvamSpeech,
     sarvamSpeech,
     telegramBot,
+    {
+      instamartClient: instamartMcpStub,
+      encryptionSecret: env.ENCRYPTION_SECRET,
+    },
   );
   const telegramOnboarding = new TelegramOnboardingService(telegramRepository, {
     botUserId: env.TELEGRAM_BOT_TOKEN.split(":")[0],
@@ -49,7 +53,12 @@ export function createServer(env: AppEnv) {
   app.post("/telegram/webhook", async (request, response, next) => {
     try {
       const result = await telegramOnboarding.handleUpdate(request.body);
-      await Promise.all(result.actions.map((action) => telegramBot.dispatch(action)));
+      const actionResults = await Promise.allSettled(result.actions.map((action) => telegramBot.dispatch(action)));
+      for (const actionResult of actionResults) {
+        if (actionResult.status === "rejected") {
+          console.error(actionResult.reason);
+        }
+      }
       response.status(result.duplicate ? 200 : 202).json({ ok: true, actionCount: result.actions.length });
     } catch (error) {
       next(error);

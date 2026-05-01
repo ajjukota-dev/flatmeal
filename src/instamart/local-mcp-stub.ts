@@ -1,10 +1,10 @@
 import { INSTAMART_TOOL_NAMES, type InstamartToolName } from "./contract-tools.js";
 
-type ToolEnvelope =
+export type ToolEnvelope =
   | { success: true; data: Record<string, unknown>; message?: string }
   | { success: false; error: { message: string; reportLink?: string; reportHint?: string } };
 
-type CallInput = {
+export type InstamartToolCallInput = {
   name: string;
   arguments?: Record<string, unknown>;
   context?: {
@@ -13,6 +13,10 @@ type CallInput = {
     checkoutApproval?: unknown;
     simulateCheckoutUncertainty?: unknown;
   };
+};
+
+export type InstamartMcpClient = {
+  callTool(input: InstamartToolCallInput): Promise<ToolEnvelope>;
 };
 
 type StubAddress = {
@@ -133,7 +137,7 @@ export class LocalInstamartMcpStub {
     return INSTAMART_TOOL_NAMES.map((name) => ({ name }));
   }
 
-  async callTool(input: CallInput): Promise<ToolEnvelope> {
+  async callTool(input: InstamartToolCallInput): Promise<ToolEnvelope> {
     const toolName = parseToolName(input.name);
     if (!toolName) {
       return failure(`Unknown Instamart tool: ${input.name}`);
