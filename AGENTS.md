@@ -28,10 +28,13 @@ Current product direction:
 
 ## 2. Required Documentation Review
 
+Before implementing any code change, re-read the relevant local `.md` files first, then follow the links inside those files to the applicable live documentation. Do this per implementation task, not only once per session.
+
 Before implementing external integrations, read the relevant official docs linked from the project docs.
 
 For Swiggy work, read thoroughly before coding:
 
+- The relevant local planning/contract `.md` files and every Swiggy documentation link they reference for the tool or workflow being implemented
 - Swiggy docs index: `https://mcp.swiggy.com/builders/llms.txt`
 - Swiggy full docs context: `https://mcp.swiggy.com/builders/llms-full.txt` when broad context is needed
 - Per-page Markdown by appending `.md` to any Swiggy docs URL when implementing a specific tool
