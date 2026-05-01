@@ -127,6 +127,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Agent created and pushed a docs-only tracker follow-up on `main` recording the live-smoke fix push state.
 - 2026-05-01: Agent created and pushed Telegram voice STT smoke commit `e4ec062` on `main` covering real Telegram voice-note polling/download/transcription verification and this tracker.
 - 2026-05-01: Agent created and pushed a docs-only tracker follow-up on `main` recording the Telegram voice STT smoke push state.
+- 2026-05-02: Agent created and pushed M6 cart approval checkout commit `f1ce506` on `main` covering group intake tracker verification, live Swiggy M6 doc recheck, revisioned cart approval callbacks, cart build through local Instamart tools, Supabase cart/order state, guarded approval checkout, and this tracker.
 
 ## Milestone Update Template
 
