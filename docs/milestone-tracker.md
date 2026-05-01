@@ -5,7 +5,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 ## Current Milestone
 
 - **Current:** M5 — OpenAI agent intent/extraction, Sarvam STT/TTS, cook prompt flow.
-- **Status:** Ready to start.
+- **Status:** In progress.
 - **Goal:** Add backend-managed OpenAI specialist-agent phases and Sarvam speech adapters for Telegram text/voice intent extraction and cook prompt delivery, without letting agents own cart truth or checkout state.
 
 ## Build Order
@@ -51,8 +51,9 @@ Persistent progress tracker for coding agents. Update this file after every mean
 
 ## In Progress
 
-- M5 is ready to begin:
+- M5 is in progress:
   - Re-read OpenAI, Sarvam, Telegram, and agent architecture docs before coding.
+  - Fetched current OpenAI Agents SDK and Sarvam STT/TTS docs before implementation.
   - Add structured intent/extraction schemas and backend-managed specialist-agent wrappers.
   - Add Sarvam STT/TTS adapters behind small provider interfaces.
   - Keep Supabase as authoritative memory; agent/session state must not own cart, approval, OAuth, address, or order truth.
@@ -90,6 +91,12 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Started M4 by re-reading local Swiggy contract docs and fetching live Swiggy docs for auth, delegated auth, Instamart overview, grocery recipe, errors, and all 13 Instamart tool pages into `/private/tmp/flatmeal-swiggy-docs-m4`. Confirmed implementation will start with contract tests before local MCP stub code.
 - 2026-05-01: Added M4 local Instamart MCP contract tests before implementation. Initial `npm test` failed as expected because `src/instamart/local-mcp-stub.ts` does not exist yet.
 - 2026-05-01: Completed M4 local Instamart MCP stub. Verified live Swiggy docs fetched into `/private/tmp/flatmeal-swiggy-docs-m4`, all 13 local tool handlers, strict argument validation, no auth credentials in tool arguments, `spinId` variants, full-cart replacement, checkout approval/stale/duplicate gates, uncertain-checkout `get_orders` branch, order details/tracking, sanitized `report_error`, and `/mcp/instamart` JSON-RPC route wiring. Verified with `npm test`, `npm run typecheck`, `npm run build`, and `git diff --check`.
+- 2026-05-01: Started M5 by re-reading local MVP, agent architecture, context, Swiggy observability, Swiggy contract, and milestone docs. Fetched official OpenAI Agents SDK docs into `/private/tmp/flatmeal-openai-sarvam-docs-m5` and confirmed `@openai/agents`, `Agent`, `run`, Zod `outputType`, and run tracing metadata controls. Fetched official Sarvam STT/TTS Markdown docs and confirmed REST endpoints `/speech-to-text` and `/text-to-speech`, `api-subscription-key` auth header, required STT `file`, required TTS `text` plus `target_language_code`, STT `transcript` response, and TTS `audios` response.
+- 2026-05-01: Added M5 strict Zod structured-output schemas for intent, meal requests, cook prompts, missing items, and cart build plans. Verified with `npm test -- src/agents/schemas.test.ts`.
+- 2026-05-01: Added M5 backend-owned OpenAI specialist-agent wrappers using `@openai/agents`, no model-owned tools for intent/extraction/cook-prompt phases, max-turn agent runs, sanitized trace metadata, and runtime output validation before workflow consumption. Verified with `npm test -- src/agents/specialists.test.ts` and `npm run typecheck`.
+- 2026-05-01: Added M5 Sarvam STT/TTS provider interfaces and REST adapter using official `/speech-to-text` multipart `file` upload, `/text-to-speech` JSON request, `api-subscription-key` auth header, STT `transcript` parsing, TTS `audios` base64 decoding, and documented Sarvam error-envelope surfacing. Verified with `npm test -- src/speech/sarvam.test.ts` and `npm run typecheck`.
+- 2026-05-01: Rechecked live Telegram Bot API docs for `Voice`, `getFile`, file download URLs, and `sendVoice`. Added Telegram voice-file download and multipart `sendVoice` primitives for future Sarvam STT/TTS wiring. Verified with `npm test -- src/telegram/bot-api.test.ts` and `npm run typecheck`.
+- 2026-05-01: Completed M5 foundation slice for structured OpenAI specialist agents, Sarvam speech adapters, and Telegram voice primitives. Verified with `npm test` (10 files / 40 tests), `npm run typecheck`, `npm run build`, and `git diff --check`. Remaining M5 work is wiring these primitives into the Telegram message workflow and persisting `voice_assets`/`agent_runs` records.
 
 ## Commit / Push History
 
@@ -100,6 +107,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Agent created and pushed M3 fake Swiggy OAuth update on `main` covering PKCE routes, owner-only connection start, encrypted fake token storage, Telegram owner connect links, and this tracker.
 - 2026-05-01: Agent created and pushed docs verification update on `main` covering stricter per-task live-doc review rules in `AGENTS.md` and M0-M3 live Swiggy verification in this tracker.
 - 2026-05-01: Agent created and pushed M4 local Instamart MCP stub update on `main` covering 13 contract-tested local tools, `/mcp/instamart` JSON-RPC route wiring, checkout safety gates, and this tracker.
+- 2026-05-01: Agent created M5 foundation commit on `main` covering OpenAI structured specialist-agent wrappers, Sarvam STT/TTS provider adapters, Telegram voice primitives, and this tracker. Push pending.
 
 ## Milestone Update Template
 

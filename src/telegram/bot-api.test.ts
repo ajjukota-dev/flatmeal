@@ -61,4 +61,64 @@ describe("TelegramBotApi", () => {
       text: "Connect Swiggy: http://localhost:3000/swiggy/connect/start?householdId=hh&ownerMemberId=member",
     });
   });
+
+  it("downloads Telegram voice files through getFile file_path", async () => {
+    const calls: Array<{ url: string; body?: unknown }> = [];
+    const bot = new TelegramBotApi("123:secret", async (url, init) => {
+      calls.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      if (String(url).endsWith("/getFile")) {
+        return Response.json({
+          ok: true,
+          result: {
+            file_id: "voice-file-id",
+            file_unique_id: "voice-unique-id",
+            file_size: 12,
+            file_path: "voice/file_1.oga",
+          },
+        });
+      }
+      return new Response("voice-bytes");
+    });
+
+    await expect(bot.downloadVoice("voice-file-id")).resolves.toMatchObject({
+      file: { file_id: "voice-file-id", file_path: "voice/file_1.oga" },
+      filename: "file_1.oga",
+      data: Buffer.from("voice-bytes"),
+    });
+
+    expect(calls).toEqual([
+      {
+        url: "https://api.telegram.org/bot123:secret/getFile",
+        body: { file_id: "voice-file-id" },
+      },
+      {
+        url: "https://api.telegram.org/file/bot123:secret/voice/file_1.oga",
+        body: undefined,
+      },
+    ]);
+  });
+
+  it("uploads cook prompts with sendVoice multipart fields", async () => {
+    const calls: Array<{ url: string; body?: BodyInit | null }> = [];
+    const bot = new TelegramBotApi("123:secret", async (url, init) => {
+      calls.push({ url: String(url), body: init?.body });
+      return Response.json({ ok: true, result: { message_id: 1 } });
+    });
+
+    await bot.sendVoice({
+      chatId: "-100",
+      voice: new Blob(["voice"], { type: "audio/ogg" }),
+      filename: "cook_prompt.ogg",
+      caption: "Cook prompt",
+      duration: 4,
+    });
+
+    expect(calls[0]?.url).toBe("https://api.telegram.org/bot123:secret/sendVoice");
+    const body = calls[0]?.body;
+    expect(body).toBeInstanceOf(FormData);
+    expect((body as FormData).get("chat_id")).toBe("-100");
+    expect((body as FormData).get("voice")).toBeInstanceOf(Blob);
+    expect((body as FormData).get("caption")).toBe("Cook prompt");
+    expect((body as FormData).get("duration")).toBe("4");
+  });
 });
