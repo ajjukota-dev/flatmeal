@@ -152,6 +152,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-02: Agent created and pushed M6 add-more completion commit `cb3c794` on `main` covering `cart_addition_agent`, timed add-more state, full-cart replacement revision rebuild, `smoke:m6`, M6 completion, and this tracker.
 - 2026-05-02: Agent created and pushed M7 observability commit on `main` covering `agent_events` writes, event/order correlation, M7 eval fixtures, `smoke:m7`, demo checklist, and this tracker.
 - 2026-05-02: Agent created and pushed commit `3fbd87d` on `main`, which also corrected the Render start command to `node dist/src/index.js`; Render deployment is live after env fixes.
+- 2026-05-02: Agent created and pushed owner-only approval commit `914cc8c` on `main` covering `direct_purchase_request`, owner-only cart approval gates, M6 smoke/test updates, and product/contract doc alignment.
 
 ## Milestone Update Template
 
