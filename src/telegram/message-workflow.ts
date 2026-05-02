@@ -126,7 +126,7 @@ export class TelegramMessageWorkflowService {
       }
 
       if (intent.intent === "direct_purchase_request" && (input.member.role === "owner" || input.member.role === "flatmate")) {
-        return await this.handleCookMissingItems(input, messageText.text, traceBase);
+        return await this.handleCookMissingItems(input, messageText.text, traceBase, { proceedWithExtractedItems: true });
       }
 
       return [];
@@ -432,6 +432,7 @@ export class TelegramMessageWorkflowService {
     input: TelegramMessageWorkflowInput,
     text: string,
     traceBase: AgentTraceContext,
+    options: { proceedWithExtractedItems?: boolean } = {},
   ): Promise<TelegramAction[]> {
     const missing = await this.runRecordedAgent(
       "missing_items_agent",
@@ -442,7 +443,7 @@ export class TelegramMessageWorkflowService {
       traceBase,
     );
 
-    if (missing.requiresClarification && missing.clarificationQuestion) {
+    if (missing.requiresClarification && missing.clarificationQuestion && (!options.proceedWithExtractedItems || missing.items.length === 0)) {
       return [{ type: "send_text_message", chatId: input.chat.telegramChatId, text: missing.clarificationQuestion }];
     }
 

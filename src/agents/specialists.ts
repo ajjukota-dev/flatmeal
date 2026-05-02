@@ -184,7 +184,8 @@ function createSpecialistAgents(model?: string): Record<SpecialistAgentName, Any
       name: "missing_items_agent",
       instructions: [
         "Extract grocery items from a cook reply, cook restock request, or direct owner/flatmate purchase request.",
-        "Include quantity and unit only when present or clearly implied; ask for clarification when the message is too ambiguous.",
+        "A clear grocery item without quantity is still actionable; omit quantity instead of asking for clarification.",
+        "Include quantity and unit only when present or clearly implied; ask for clarification only when item identity is too ambiguous.",
         "Do not call tools and do not build a cart.",
       ].join(" "),
       tools: [],

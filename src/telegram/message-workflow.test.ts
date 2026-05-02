@@ -590,6 +590,63 @@ describe("TelegramMessageWorkflowService", () => {
     ]);
   });
 
+  it("builds a direct purchase cart when the item is clear but quantity is missing", async () => {
+    const repository = new FakeRepository();
+    const encryptionSecret = "m6-secret";
+    repository.swiggyConnection = {
+      id: "swiggy-connection-1",
+      encryptedAccessToken: encryptSecret("fake-swiggy-token", encryptionSecret),
+    };
+    const runner = new FakeRunner([
+      {
+        intent: "direct_purchase_request",
+        confidence: 0.92,
+        language: "en",
+        reason: "Owner asked to buy milk.",
+        requiresClarification: false,
+      },
+      {
+        items: [{ name: "milk", confidence: 0.7 }],
+        requiresClarification: true,
+        clarificationQuestion: "How much milk should I add?",
+      },
+      {
+        addressId: "addr_home",
+        items: [{ requestedName: "milk", searchQuery: "milk", selectedSpinId: "spin_milk_1l", quantity: 1 }],
+      },
+    ]);
+    const workflow = new TelegramMessageWorkflowService(
+      repository,
+      new OpenAISpecialistAgents({ runner }),
+      new FakeSpeechProvider(),
+      new FakeSpeechProvider(),
+      new FakeVoiceDownloader(),
+      { instamartClient: new LocalInstamartMcpStub(), encryptionSecret },
+    );
+
+    const actions = await workflow.handleMessage({
+      chat,
+      member: { id: "member-owner", householdId: "household-1", telegramUserId: "user-owner", role: "owner" },
+      messageEventId: "message-event-direct-buy-no-quantity",
+      message: textMessage("Order milk"),
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        type: "send_cart_approval_card",
+        cartSessionId: "cart-1",
+        revision: 1,
+      }),
+    ]);
+    expect(repository.cartItems).toEqual([
+      expect.objectContaining({
+        requestedName: "milk",
+        spinId: "spin_milk_1l",
+        quantity: 1,
+      }),
+    ]);
+  });
+
   it("opens one add-more window and rebuilds a full replacement cart at the next revision", async () => {
     const repository = new FakeRepository();
     const encryptionSecret = "m6-secret";
