@@ -157,7 +157,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-02: Agent created and pushed commit `3fbd87d` on `main`, which also corrected the Render start command to `node dist/src/index.js`; Render deployment is live after env fixes.
 - 2026-05-02: Agent created and pushed owner-only approval commit `914cc8c` on `main` covering `direct_purchase_request`, owner-only cart approval gates, M6 smoke/test updates, and product/contract doc alignment.
 - 2026-05-02: Agent created and pushed commit `f0af13a` on `main` covering M8 live-rehearsal safe-failure and fake order persistence fixes.
-- 2026-05-02: Planned commit `fix: handle direct grocery quantity gaps` covering direct-purchase cart continuation when quantity is omitted.
+- 2026-05-02: Agent created and pushed commit `1d57002` on `main` covering direct-purchase cart continuation when quantity is omitted.
 
 ## Milestone Update Template
 
