@@ -3,6 +3,7 @@ import { OpenAISpecialistAgents, type SpecialistAgentRunOptions, type Structured
 import { encryptSecret } from "../src/crypto/secrets.js";
 import { LocalInstamartMcpStub } from "../src/instamart/local-mcp-stub.js";
 import type {
+  AgentEventInsert,
   AgentRunInsert,
   CartItemInsert,
   OrderInsert,
@@ -94,6 +95,7 @@ class SmokeRepository implements TelegramOnboardingRepository {
   cartItems: StoredCartItem[] = [];
   orders: OrderInsert[] = [];
   agentRuns: Array<AgentRunInsert & { id: string }> = [];
+  agentEvents: AgentEventInsert[] = [];
 
   constructor(encryptionSecret: string) {
     this.connection = {
@@ -104,6 +106,10 @@ class SmokeRepository implements TelegramOnboardingRepository {
 
   async recordMessageEvent(_input: MessageEventInsert): Promise<{ id?: string; duplicate: boolean }> {
     return { id: "message-event-smoke", duplicate: false };
+  }
+
+  async recordAgentEvent(input: AgentEventInsert): Promise<void> {
+    this.agentEvents.push(input);
   }
 
   async ensureHouseholdForChat(chat: TelegramChat): Promise<StoredHouseholdChat> {
@@ -295,6 +301,28 @@ assert(checkoutActions.some((action) => action.type === "send_text_message"), "A
 const checkedOutSession: StoredCartSession | undefined = repository.cartSessions[0];
 assert(checkedOutSession?.status === "checked_out", "Cart did not move to checked_out after approval");
 assert(repository.orders[0]?.swiggyOrderId?.startsWith("IM-"), "Checkout did not persist a local Instamart order");
+assert(
+  JSON.stringify(repository.agentEvents.map((event) => event.eventType)) === JSON.stringify([
+    "message_intake",
+    "intent_classified",
+    "agent_run_completed",
+    "cart_build_started",
+    "agent_run_completed",
+    "cart_built",
+    "upsell_opened",
+    "message_intake",
+    "intent_classified",
+    "agent_run_completed",
+    "agent_run_completed",
+    "cart_revision_updated",
+    "cart_approval_requested",
+    "approval_received",
+    "checkout_started",
+    "checkout_succeeded",
+    "order_tracking_checked",
+  ]),
+  "M7 agent event trajectory changed unexpectedly",
+);
 
 assert(
   JSON.stringify(runner.calls) === JSON.stringify([

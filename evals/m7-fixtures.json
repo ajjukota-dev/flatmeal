@@ -1,0 +1,92 @@
+{
+  "intentExtraction": [
+    {
+      "id": "hinglish-cook-restock",
+      "senderRole": "cook",
+      "input": "chawal khatam hai, dahi bhi nahi hai",
+      "expectedIntent": "cook_restock_request",
+      "expectedItems": ["rice", "curd"]
+    },
+    {
+      "id": "hindi-flatmate-meal",
+      "senderRole": "flatmate",
+      "input": "kal raat ke liye 4 logon ka dal chawal bana do, kam mirchi",
+      "expectedIntent": "flatmate_meal_request",
+      "expectedMeal": { "dish": "dal chawal", "servings": 4, "spiceLevel": "less" }
+    },
+    {
+      "id": "english-add-more-window",
+      "senderRole": "flatmate",
+      "activeWorkflow": "upsell_open",
+      "input": "add one litre milk too",
+      "expectedIntent": "flatmate_cart_addition",
+      "expectedItems": ["milk"]
+    }
+  ],
+  "cartSafety": [
+    {
+      "id": "stale-approval-rejected",
+      "cartStatus": "approval_pending",
+      "latestRevision": 2,
+      "approvalRevision": 1,
+      "expectedEvent": "approval_rejected",
+      "expectedCheckout": false
+    },
+    {
+      "id": "duplicate-checkout-rejected",
+      "cartStatus": "checked_out",
+      "latestRevision": 2,
+      "approvalRevision": 2,
+      "expectedEvent": "approval_rejected",
+      "expectedCheckout": false
+    },
+    {
+      "id": "latest-owner-approval-checks-out",
+      "cartStatus": "approval_pending",
+      "latestRevision": 2,
+      "approvalRevision": 2,
+      "approverRole": "owner",
+      "expectedEvent": "checkout_succeeded",
+      "expectedCheckout": true
+    }
+  ],
+  "swiggyErrorBranches": [
+    {
+      "id": "auth-401-reconnect",
+      "tool": "get_cart",
+      "failure": "401 or JSON-RPC -32001",
+      "expectedUserSafeAction": "ask owner to reconnect Swiggy",
+      "retryableWithSameToken": false
+    },
+    {
+      "id": "checkout-uncertain-get-orders",
+      "tool": "checkout",
+      "failure": "5xx or network uncertainty",
+      "expectedToolBeforeRetry": "get_orders",
+      "retryableWithSameToken": true
+    },
+    {
+      "id": "domain-failure-surface",
+      "tool": "update_cart",
+      "failure": "success false domain envelope",
+      "expectedUserSafeAction": "surface error to Telegram",
+      "retryableWithSameToken": false
+    }
+  ],
+  "expectedAgentEvents": [
+    "message_intake",
+    "voice_transcribed",
+    "intent_classified",
+    "agent_run_completed",
+    "cart_build_started",
+    "cart_built",
+    "upsell_opened",
+    "cart_revision_updated",
+    "cart_approval_requested",
+    "approval_received",
+    "approval_rejected",
+    "checkout_started",
+    "checkout_succeeded",
+    "order_tracking_checked"
+  ]
+}

@@ -13,6 +13,7 @@ import type { InstamartMcpClient, ToolEnvelope } from "../instamart/local-mcp-st
 import type { TextToSpeechProvider, SpeechToTextProvider, SarvamTextToSpeechLanguage } from "../speech/types.js";
 import type { DownloadedTelegramFile } from "./bot-api.js";
 import type {
+  AgentEventInsert,
   CartItemInsert,
   StoredCartItem,
   StoredCartSession,
@@ -55,6 +56,15 @@ export class TelegramMessageWorkflowService {
   ) {}
 
   async handleMessage(input: TelegramMessageWorkflowInput): Promise<TelegramAction[]> {
+    await this.recordEvent(input, {
+      eventType: "message_intake",
+      sanitizedPayload: {
+        messageKind: input.message.voice ? "voice" : "text",
+        senderRole: input.member?.role ?? "unknown",
+        telegramMessageId: String(input.message.message_id),
+      },
+    });
+
     if (!input.member) {
       return [];
     }
@@ -131,20 +141,51 @@ export class TelegramMessageWorkflowService {
     });
 
     if (!input.member || (input.member.role !== "owner" && input.member.role !== "flatmate")) {
+      await this.recordEventForChat(input.chat, {
+        eventType: "approval_rejected",
+        cartSessionId: input.cartSessionId,
+        status: "warning",
+        userSafeMessage: "Only owner or flatmate can approve checkout.",
+        sanitizedPayload: { revision: input.revision, reason: "role_not_allowed" },
+      });
       return [answer("Only owner or flatmate can approve checkout.")];
     }
 
     const cartSession = await this.repository.findCartSession(input.cartSessionId);
     if (!cartSession || cartSession.householdId !== input.chat.householdId) {
+      await this.recordEventForChat(input.chat, {
+        eventType: "approval_rejected",
+        cartSessionId: input.cartSessionId,
+        status: "warning",
+        sanitizedPayload: { revision: input.revision, reason: "cart_session_not_found" },
+      });
       return [answer("Cart session was not found.")];
     }
     if (cartSession.status === "checked_out") {
+      await this.recordEventForChat(input.chat, {
+        eventType: "approval_rejected",
+        cartSessionId: cartSession.id,
+        status: "warning",
+        sanitizedPayload: { revision: input.revision, reason: "already_checked_out" },
+      });
       return [answer("Cart is already checked out.")];
     }
     if (cartSession.revision !== input.revision) {
+      await this.recordEventForChat(input.chat, {
+        eventType: "approval_rejected",
+        cartSessionId: cartSession.id,
+        status: "warning",
+        sanitizedPayload: { requestedRevision: input.revision, latestRevision: cartSession.revision, reason: "stale_revision" },
+      });
       return [answer("This approval button is stale. Please approve the latest cart.")];
     }
     if (cartSession.status !== "approval_pending") {
+      await this.recordEventForChat(input.chat, {
+        eventType: "approval_rejected",
+        cartSessionId: cartSession.id,
+        status: "warning",
+        sanitizedPayload: { revision: input.revision, cartStatus: cartSession.status, reason: "cart_not_pending" },
+      });
       return [answer("Cart is not waiting for approval.")];
     }
     if (!cartSession.selectedAddressId) {
@@ -169,10 +210,30 @@ export class TelegramMessageWorkflowService {
       approvedByMemberId: input.member.id,
     });
     if (!approved) {
+      await this.recordEventForChat(input.chat, {
+        eventType: "approval_rejected",
+        cartSessionId: cartSession.id,
+        status: "warning",
+        sanitizedPayload: { revision: cartSession.revision, reason: "approval_race_lost" },
+      });
       return [answer("This cart is no longer waiting for approval.")];
     }
+    await this.recordEventForChat(input.chat, {
+      eventType: "approval_received",
+      cartSessionId: cartSession.id,
+      userSafeMessage: "Latest cart revision approved.",
+      sanitizedPayload: {
+        revision: cartSession.revision,
+        approvedByMemberId: input.member.id,
+      },
+    });
 
     const accessToken = decryptSecret(connection.encryptedAccessToken, this.requireCartOptions().encryptionSecret);
+    await this.recordEventForChat(input.chat, {
+      eventType: "checkout_started",
+      cartSessionId: cartSession.id,
+      sanitizedPayload: { revision: cartSession.revision },
+    });
     const cart = await this.callInstamart("get_cart", {}, accessToken);
     if (!cart.success) {
       return this.cartFailureActions(input.chat.telegramChatId, answer, "Could not re-read cart before checkout", cart);
@@ -207,13 +268,20 @@ export class TelegramMessageWorkflowService {
       if (checkout.error.message.includes("uncertain")) {
         const orders = await this.callInstamart("get_orders", { activeOnly: true }, accessToken);
         if (orders.success && readOrders(orders.data.orders).length > 0) {
-          await this.persistOrdersFromTool({
+          const persistedOrders = await this.persistOrdersFromTool({
             householdId: input.chat.householdId,
             cartSessionId: cartSession.id,
             swiggyConnectionId: connection.id,
             orders: readOrders(orders.data.orders),
           });
           await this.repository.markCartCheckedOut(cartSession.id);
+          await this.recordEventForChat(input.chat, {
+            eventType: "checkout_succeeded",
+            cartSessionId: cartSession.id,
+            orderId: persistedOrders[0]?.rowId,
+            userSafeMessage: "Order found after checkout uncertainty check.",
+            sanitizedPayload: { revision: cartSession.revision, source: "get_orders_after_uncertain_checkout" },
+          });
           return [
             answer("Order found after checkout check."),
             {
@@ -228,15 +296,41 @@ export class TelegramMessageWorkflowService {
     }
 
     const orders = readOrders(checkout.data.orders);
-    await this.persistOrdersFromTool({
+    const persistedOrders = await this.persistOrdersFromTool({
       householdId: input.chat.householdId,
       cartSessionId: cartSession.id,
       swiggyConnectionId: connection.id,
       orders,
     });
     await this.repository.markCartCheckedOut(cartSession.id);
+    await this.recordEventForChat(input.chat, {
+      eventType: "checkout_succeeded",
+      cartSessionId: cartSession.id,
+      orderId: persistedOrders[0]?.rowId,
+      userSafeMessage: "Instamart checkout completed.",
+      sanitizedPayload: {
+        revision: cartSession.revision,
+        orderCount: orders.length,
+        orderIds: orders.map((order) => order.orderId),
+      },
+    });
 
     const tracking = await this.trackFirstOrder(accessToken, orders);
+    if (tracking) {
+      const firstOrder = orders[0];
+      const firstPersistedOrder = firstOrder
+        ? persistedOrders.find((order) => order.localOrderId === firstOrder.orderId)
+        : undefined;
+      await this.recordEventForChat(input.chat, {
+        eventType: "order_tracking_checked",
+        cartSessionId: cartSession.id,
+        orderId: firstPersistedOrder?.rowId,
+        sanitizedPayload: {
+          orderId: firstOrder?.orderId,
+          status: typeof tracking.status === "string" ? tracking.status : undefined,
+        },
+      });
+    }
     const message = formatOrderConfirmation(checkout.message ?? "Instamart order placed successfully.", orders, cartData, tracking);
 
     return [
@@ -385,6 +479,16 @@ export class TelegramMessageWorkflowService {
       swiggyConnectionId: connection.id,
       selectedAddressId: address.id,
     });
+    await this.recordEvent(input, {
+      eventType: "cart_build_started",
+      cartSessionId: cartSession.id,
+      userSafeMessage: "Started Instamart cart build.",
+      sanitizedPayload: {
+        revision: cartSession.revision,
+        itemCount: missing.items.length,
+        addressId: address.id,
+      },
+    });
 
     const candidateProducts: Array<{ requestedName: string; products: unknown[] }> = [];
     for (const item of missing.items) {
@@ -449,6 +553,16 @@ export class TelegramMessageWorkflowService {
 
     const cartItems = buildCartItemRows(plan.items, readCartItems(cart.data.items));
     await this.repository.replaceCartItems({ cartSessionId: cartSession.id, revision: cartSession.revision, items: cartItems });
+    await this.recordEvent(input, {
+      eventType: "cart_built",
+      cartSessionId: cartSession.id,
+      userSafeMessage: "Instamart cart built.",
+      sanitizedPayload: {
+        revision: cartSession.revision,
+        itemCount: cartItems.length,
+        totalMinor: readTotalMinor(cart.data.bill),
+      },
+    });
 
     const addMoreGap = readAddMoreGap(cart.data.bill);
     if (addMoreGap !== null) {
@@ -456,6 +570,16 @@ export class TelegramMessageWorkflowService {
         cartSessionId: cartSession.id,
         revision: cartSession.revision,
         expiresAt: new Date(Date.now() + 2 * 60 * 1000),
+      });
+      await this.recordEvent(input, {
+        eventType: "upsell_opened",
+        cartSessionId: cartSession.id,
+        userSafeMessage: "Add-more window opened.",
+        sanitizedPayload: {
+          revision: cartSession.revision,
+          addMoreGap,
+          expiresInSeconds: 120,
+        },
       });
       return [
         {
@@ -467,6 +591,15 @@ export class TelegramMessageWorkflowService {
     }
 
     await this.repository.markCartApprovalPending({ cartSessionId: cartSession.id, revision: cartSession.revision });
+    await this.recordEvent(input, {
+      eventType: "cart_approval_requested",
+      cartSessionId: cartSession.id,
+      userSafeMessage: "Cart approval requested.",
+      sanitizedPayload: {
+        revision: cartSession.revision,
+        totalMinor: readTotalMinor(cart.data.bill),
+      },
+    });
 
     return [
       {
@@ -615,6 +748,26 @@ export class TelegramMessageWorkflowService {
         readCartItems(cart.data.items),
       ),
     });
+    await this.recordEvent(input, {
+      eventType: "cart_revision_updated",
+      cartSessionId: cartSession.id,
+      userSafeMessage: "Cart revision updated with add-more item.",
+      sanitizedPayload: {
+        previousRevision: cartSession.revision,
+        revision: nextRevision,
+        addedItemCount: addition.items.length,
+        totalMinor: readTotalMinor(cart.data.bill),
+      },
+    });
+    await this.recordEvent(input, {
+      eventType: "cart_approval_requested",
+      cartSessionId: cartSession.id,
+      userSafeMessage: "Cart approval requested.",
+      sanitizedPayload: {
+        revision: nextRevision,
+        totalMinor: readTotalMinor(cart.data.bill),
+      },
+    });
 
     return [
       {
@@ -662,6 +815,15 @@ export class TelegramMessageWorkflowService {
     if (!moved) {
       return [{ type: "send_text_message", chatId: chat.telegramChatId, text: "Cart changed while finalizing. Please use the latest cart." }];
     }
+    await this.recordEventForChat(chat, {
+      eventType: "cart_approval_requested",
+      cartSessionId: cartSession.id,
+      userSafeMessage: "Cart approval requested after add-more window.",
+      sanitizedPayload: {
+        revision: cartSession.revision,
+        totalMinor: readTotalMinor(cart.data.bill),
+      },
+    });
 
     return [
       {
@@ -703,9 +865,27 @@ export class TelegramMessageWorkflowService {
         transcript: transcription.transcript,
         languageCode: transcription.languageCode,
       });
+      await this.recordEvent(input, {
+        eventType: "voice_transcribed",
+        userSafeMessage: "Voice note transcribed.",
+        sanitizedPayload: {
+          voiceAssetId: voiceAsset.id,
+          transcriptLength: transcription.transcript.length,
+          languageCode: transcription.languageCode,
+        },
+      });
       return { text: transcription.transcript, source: "voice", languageCode: transcription.languageCode };
     } catch (error) {
       await this.repository.markVoiceAssetFailed({ id: voiceAsset.id });
+      await this.recordEvent(input, {
+        eventType: "voice_transcription_failed",
+        status: "failed",
+        retryable: true,
+        sanitizedPayload: {
+          voiceAssetId: voiceAsset.id,
+          errorSummary: error instanceof Error ? error.message : "Voice transcription failed",
+        },
+      });
       throw error;
     }
   }
@@ -735,13 +915,66 @@ export class TelegramMessageWorkflowService {
         intent: agentName === "message_intent_agent" ? String(sanitizedOutput.intent) : undefined,
         sanitizedOutput,
       });
+      await this.recordEvent(input, {
+        eventType: agentName === "message_intent_agent" ? "intent_classified" : "agent_run_completed",
+        agentRunId: agentRun.id,
+        cartSessionId: traceBase.cartSessionId,
+        sanitizedPayload: {
+          agentName,
+          traceId,
+          ...sanitizedOutput,
+        },
+      });
       return output;
     } catch (error) {
       await this.repository.failAgentRun({
         id: agentRun.id,
         errorSummary: error instanceof Error ? error.message : "Agent run failed",
       });
+      await this.recordEvent(input, {
+        eventType: "agent_run_failed",
+        agentRunId: agentRun.id,
+        cartSessionId: traceBase.cartSessionId,
+        status: "failed",
+        retryable: false,
+        sanitizedPayload: {
+          agentName,
+          traceId,
+          errorSummary: error instanceof Error ? error.message : "Agent run failed",
+        },
+      });
       throw error;
+    }
+  }
+
+  private async recordEvent(input: TelegramMessageWorkflowInput, event: Omit<AgentEventInsert, "householdId" | "telegramChatRowId" | "messageEventId">): Promise<void> {
+    await this.recordEventForChat(input.chat, {
+      messageEventId: input.messageEventId,
+      ...event,
+    });
+  }
+
+  private async recordEventForChat(
+    chat: StoredHouseholdChat,
+    event: Omit<AgentEventInsert, "householdId" | "telegramChatRowId">,
+  ): Promise<void> {
+    try {
+      const sanitizedPayload = {
+        telegramChatId: chat.telegramChatId,
+        ...(event.sanitizedPayload ?? {}),
+      };
+      await this.repository.recordAgentEvent({
+        householdId: chat.householdId,
+        telegramChatRowId: chat.id,
+        status: "ok",
+        ...event,
+        sanitizedPayload,
+      });
+    } catch (error) {
+      console.warn("agent_event_record_failed", {
+        eventType: event.eventType,
+        errorSummary: error instanceof Error ? error.message : "Agent event insert failed",
+      });
     }
   }
 
@@ -788,9 +1021,10 @@ export class TelegramMessageWorkflowService {
     cartSessionId: string;
     swiggyConnectionId: string;
     orders: ToolOrder[];
-  }): Promise<void> {
+  }): Promise<Array<{ localOrderId: string; rowId: string }>> {
+    const persistedOrders: Array<{ localOrderId: string; rowId: string }> = [];
     for (const order of input.orders) {
-      await this.repository.recordOrder({
+      const persisted = await this.repository.recordOrder({
         householdId: input.householdId,
         cartSessionId: input.cartSessionId,
         swiggyConnectionId: input.swiggyConnectionId,
@@ -800,7 +1034,9 @@ export class TelegramMessageWorkflowService {
         totalMinor: order.bill?.grandTotal === undefined ? undefined : Math.round(order.bill.grandTotal * 100),
         trackingState: { source: "local_instamart_mcp", status: order.status, coordinates: order.coordinates },
       });
+      persistedOrders.push({ localOrderId: order.orderId, rowId: persisted.id });
     }
+    return persistedOrders;
   }
 
   private async trackFirstOrder(accessToken: string, orders: ToolOrder[]): Promise<Record<string, unknown> | undefined> {
@@ -969,6 +1205,11 @@ function readBill(value: unknown): ToolBill {
     grandTotal: typeof value.grandTotal === "number" ? value.grandTotal : undefined,
     freeDeliveryThreshold: typeof value.freeDeliveryThreshold === "number" ? value.freeDeliveryThreshold : undefined,
   };
+}
+
+function readTotalMinor(value: unknown): number | undefined {
+  const grandTotal = readBill(value).grandTotal;
+  return grandTotal === undefined ? undefined : Math.round(grandTotal * 100);
 }
 
 function readAddMoreGap(value: unknown): number | null {

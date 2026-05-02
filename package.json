@@ -16,7 +16,8 @@
     "smoke:m5:telegram": "tsx scripts/smoke-telegram-config.ts",
     "smoke:m5:telegram-voice": "tsx scripts/smoke-telegram-voice-stt.ts",
     "smoke:m6": "tsx scripts/smoke-local-m6.ts",
-    "start": "node dist/index.js",
+    "smoke:m7": "tsx scripts/verify-m7-fixtures.ts",
+    "start": "node dist/src/index.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TelegramOnboardingService } from "./onboarding.js";
 import type {
+  AgentEventInsert,
   CartItemInsert,
   MessageEventInsert,
   OrderInsert,
@@ -31,6 +32,8 @@ class InMemoryTelegramRepository implements TelegramOnboardingRepository {
     this.messageUpdateIds.add(updateId);
     return { id: `message-event-${updateId}`, duplicate: false };
   }
+
+  async recordAgentEvent(_input: AgentEventInsert): Promise<void> {}
 
   async ensureHouseholdForChat(chat: TelegramChat): Promise<StoredHouseholdChat> {
     const key = String(chat.id);

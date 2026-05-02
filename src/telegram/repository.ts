@@ -88,8 +88,23 @@ export type OrderInsert = {
   trackingState: Record<string, unknown>;
 };
 
+export type AgentEventInsert = {
+  householdId?: string;
+  telegramChatRowId?: string;
+  messageEventId?: string;
+  agentRunId?: string;
+  cartSessionId?: string;
+  orderId?: string;
+  eventType: string;
+  status?: "ok" | "warning" | "failed";
+  userSafeMessage?: string;
+  sanitizedPayload?: Record<string, unknown>;
+  retryable?: boolean;
+};
+
 export interface TelegramOnboardingRepository {
   recordMessageEvent(input: MessageEventInsert): Promise<{ id?: string; duplicate: boolean }>;
+  recordAgentEvent(input: AgentEventInsert): Promise<void>;
   ensureHouseholdForChat(chat: TelegramChat): Promise<StoredHouseholdChat>;
   upsertTelegramUser(user: TelegramUser): Promise<StoredTelegramUser>;
   findOwnerMember(householdId: string): Promise<StoredHouseholdMember | null>;

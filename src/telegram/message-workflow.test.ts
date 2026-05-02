@@ -13,6 +13,7 @@ import type {
 } from "../speech/types.js";
 import { TelegramMessageWorkflowService, type TelegramVoiceDownloader } from "./message-workflow.js";
 import type {
+  AgentEventInsert,
   AgentRunInsert,
   CartItemInsert,
   MessageEventInsert,
@@ -81,6 +82,7 @@ class FakeRepository implements TelegramOnboardingRepository {
   };
   voiceAssets: Array<{ id: string; telegramFileId: string; status: string; transcript?: string; languageCode?: string | null }> = [];
   agentRuns: Array<AgentRunInsert & { id: string; status: string; sanitizedOutput?: Record<string, unknown>; intent?: string }> = [];
+  agentEvents: AgentEventInsert[] = [];
   swiggyConnection: StoredSwiggyConnection | null = null;
   cartSessions: StoredCartSession[] = [];
   cartItems: Array<CartItemInsert & { cartSessionId: string; revision: number }> = [];
@@ -88,6 +90,10 @@ class FakeRepository implements TelegramOnboardingRepository {
 
   async recordMessageEvent(_input: MessageEventInsert): Promise<{ id?: string; duplicate: boolean }> {
     return { id: "message-event-1", duplicate: false };
+  }
+
+  async recordAgentEvent(input: AgentEventInsert): Promise<void> {
+    this.agentEvents.push(input);
   }
 
   async ensureHouseholdForChat(chat: TelegramChat): Promise<StoredHouseholdChat> {
@@ -326,6 +332,12 @@ describe("TelegramMessageWorkflowService", () => {
       ["meal_request_agent", "succeeded", undefined],
       ["cook_prompt_agent", "succeeded", undefined],
     ]);
+    expect(repository.agentEvents.map((event) => event.eventType)).toEqual([
+      "message_intake",
+      "intent_classified",
+      "agent_run_completed",
+      "agent_run_completed",
+    ]);
     expect(runner.calls.every((call) => call.options.traceIncludeSensitiveData === false)).toBe(true);
   });
 
@@ -382,6 +394,12 @@ describe("TelegramMessageWorkflowService", () => {
       },
     ]);
     expect(repository.agentRuns.map((run) => run.agentName)).toEqual(["message_intent_agent", "missing_items_agent"]);
+    expect(repository.agentEvents.map((event) => event.eventType)).toEqual([
+      "message_intake",
+      "voice_transcribed",
+      "intent_classified",
+      "agent_run_completed",
+    ]);
   });
 
   it("builds a revisioned Instamart cart from cook missing items and sends approval card", async () => {
@@ -451,6 +469,19 @@ describe("TelegramMessageWorkflowService", () => {
       "missing_items_agent",
       "cart_planner_agent",
     ]);
+    expect(repository.agentEvents.map((event) => event.eventType)).toEqual([
+      "message_intake",
+      "intent_classified",
+      "agent_run_completed",
+      "cart_build_started",
+      "agent_run_completed",
+      "cart_built",
+      "cart_approval_requested",
+    ]);
+    expect(repository.agentEvents.at(-1)).toMatchObject({
+      cartSessionId: "cart-1",
+      sanitizedPayload: expect.objectContaining({ revision: 1 }),
+    });
   });
 
   it("opens one add-more window and rebuilds a full replacement cart at the next revision", async () => {
@@ -541,6 +572,21 @@ describe("TelegramMessageWorkflowService", () => {
       "cart_addition_agent",
       "cart_planner_agent",
     ]);
+    expect(repository.agentEvents.map((event) => event.eventType)).toEqual([
+      "message_intake",
+      "intent_classified",
+      "agent_run_completed",
+      "cart_build_started",
+      "agent_run_completed",
+      "cart_built",
+      "upsell_opened",
+      "message_intake",
+      "intent_classified",
+      "agent_run_completed",
+      "agent_run_completed",
+      "cart_revision_updated",
+      "cart_approval_requested",
+    ]);
   });
 
   it("rejects stale approval callbacks and checks out only the latest revision", async () => {
@@ -618,6 +664,16 @@ describe("TelegramMessageWorkflowService", () => {
         status: "confirmed",
       }),
     ]);
+    expect(repository.agentEvents.map((event) => event.eventType)).toEqual([
+      "approval_rejected",
+      "approval_received",
+      "checkout_started",
+      "checkout_succeeded",
+      "order_tracking_checked",
+    ]);
+    expect(repository.agentEvents.find((event) => event.eventType === "checkout_succeeded")).toMatchObject({
+      orderId: "order-row-1",
+    });
   });
 });
 

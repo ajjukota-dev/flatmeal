@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  AgentEventInsert,
   AgentRunInsert,
   CartItemInsert,
   MessageEventInsert,
@@ -45,6 +46,26 @@ export class SupabaseTelegramRepository implements TelegramOnboardingRepository 
     }
 
     return { id: result.data.id, duplicate: false };
+  }
+
+  async recordAgentEvent(input: AgentEventInsert): Promise<void> {
+    const result = await this.supabase.from("agent_events").insert({
+      household_id: input.householdId,
+      telegram_chat_id: input.telegramChatRowId,
+      message_event_id: input.messageEventId,
+      agent_run_id: input.agentRunId,
+      cart_session_id: input.cartSessionId,
+      order_id: input.orderId,
+      event_type: input.eventType,
+      status: input.status ?? "ok",
+      user_safe_message: input.userSafeMessage,
+      sanitized_payload: input.sanitizedPayload ?? {},
+      retryable: input.retryable,
+    });
+
+    if (result.error) {
+      throw result.error;
+    }
   }
 
   async ensureHouseholdForChat(chat: TelegramChat): Promise<StoredHouseholdChat> {

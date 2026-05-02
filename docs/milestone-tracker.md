@@ -4,9 +4,9 @@ Persistent progress tracker for coding agents. Update this file after every mean
 
 ## Current Milestone
 
-- **Current:** M7 — Observability, `agent_events`, traces, eval fixtures, demo script.
-- **Status:** Ready to start.
-- **Goal:** Add product-visible agent events, trace correlation, focused eval fixtures, and a repeatable demo script/checklist for the Telegram-first flow.
+- **Current:** M8 — End-to-end Telegram demo and Swiggy access-review video checklist.
+- **Status:** In progress.
+- **Goal:** Rehearse and record the real Telegram-first demo flow with observability evidence and Swiggy access-review posture.
 
 ## Build Order
 
@@ -60,25 +60,30 @@ Persistent progress tracker for coding agents. Update this file after every mean
   - Added one timed add-more/free-delivery window, flatmate/owner cart additions, full-cart replacement, revision increment, and revisioned Telegram approval cards.
   - Added latest-approval checkout gates, stale approval rejection, duplicate checkout prevention, order persistence, and initial `track_order`.
   - Added deterministic `smoke:m6` for cook restock → add-more → flatmate addition → approval → checkout.
+- **M7 — Observability, `agent_events`, traces, eval fixtures, demo script.**
+  - Rechecked local product/agent/observability docs, current OpenAI tracing docs, and Supabase changelog before implementation.
+  - Added sanitized `agent_events` writes for message intake, voice transcription, intent/agent runs, cart build, upsell, cart revisions, approval, checkout, and order tracking.
+  - Correlated events with household, Telegram chat row, message event, agent run, cart session, revision payloads, and order row IDs where available.
+  - Added focused M7 eval fixtures for multilingual extraction, cart safety, stale/duplicate approval, and Swiggy error branches.
+  - Added a repeatable M7 demo checklist and `smoke:m7` fixture verification.
 
 ## In Progress
 
-- M7 is ready to start:
-  - Add sanitized `agent_events` for user-visible workflow timeline.
-  - Correlate message, agent run, cart session, revision, MCP session/tool, and order events.
-  - Add eval fixtures for multilingual extraction, cart safety, stale approval, duplicate checkout, and Swiggy error branches.
-  - Prepare repeatable end-to-end demo checklist/script.
+- M8 is ready to start:
+  - Run the real Telegram group flow with public webhook/tunnel and configured provider keys.
+  - Confirm `agent_events`, `agent_runs`, `voice_assets`, `cart_sessions`, and `orders` in Supabase during the demo.
+  - Capture the Swiggy access-review video checklist evidence.
 
 ## Next Tasks
 
-1. Add `agent_events` writes for message intake, transcription, intent, cart build, upsell, approval, checkout, and order tracking.
-2. Add trace/event correlation IDs across `agent_runs`, `cart_sessions`, `orders`, Telegram messages, and Instamart tool calls.
-3. Add eval fixtures for intent/extraction, cart planner, stale approval, duplicate checkout, and Swiggy error branches.
-4. Add a demo checklist/script covering group onboarding, fake Swiggy connect, voice request, cook reply, add-more, approval, and checkout.
+1. Start backend with the real Telegram bot token, provider keys, Supabase config, encryption secret, and public HTTPS webhook URL.
+2. Run the `docs/m7-demo-checklist.md` flow in the real Telegram group and inspect Supabase timeline rows.
+3. Record or rehearse the M8 access-review video: onboarding, fake Swiggy connect, voice request, cook reply, add-more, approval, checkout, and trace/event evidence.
+4. Document any live-demo blockers and final Swiggy review checklist gaps.
 
 ## Blockers
 
-- No implementation blockers recorded yet.
+- Render deployment was failing because the service start script expected `dist/index.js`, while the TypeScript build emits `dist/src/index.js`. The start script has been corrected to `node dist/src/index.js`; the next Render deploy needs to confirm healthy startup.
 - Future implementation requires real API keys/config from the user:
   - Telegram bot token.
   - OpenAI API key.
@@ -116,6 +121,9 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-02: Implemented M6 core cart/approval/checkout path. Added revisioned cart approval callback data, Telegram approval card sending, Supabase cart/session/order repository methods, cook missing-items cart build through `get_addresses`, `search_products`, `update_cart`, and `get_cart`, persisted cart items from local cart truth, stale approval rejection, owner/flatmate approval checks, checkout `get_cart` re-read, guarded `checkout`, order persistence, and initial `track_order`. Verified with `npm test -- src/telegram/callback-data.test.ts src/telegram/bot-api.test.ts src/telegram/message-workflow.test.ts src/telegram/onboarding.test.ts`, `npm run typecheck`, `npm test` (12 files / 50 tests), `npm run build`, `npm run smoke:m5` with escalation for tsx IPC, and `git diff --check`. Remaining M6 work is the timed add-more/free-delivery window and cart-addition revision rebuild.
 - 2026-05-02: Resumed remaining M6 work by re-reading local MVP, agent architecture, Swiggy contract, and milestone docs. Re-fetched live Swiggy docs for `search_products`, `update_cart`, `get_cart`, errors, and the order-groceries recipe into `/private/tmp/flatmeal-swiggy-docs-m6-remaining`. Confirmed add-more must still search before adding, use variant `spinId`, rebuild the full cart through replacement `update_cart`, then call `get_cart` before showing the next approval revision.
 - 2026-05-02: Completed remaining M6 add-more flow. Added `cart_addition_agent`, `upsell_open` handling, 2-minute add-more expiry state, flatmate/owner addition extraction, full-cart replacement using persisted cart truth plus new `spinId` selections, revision increment, new approval card, and lazy timeout finalization to approval. Added `npm run smoke:m6` for cook restock → add-more → flatmate addition → revisioned approval → guarded checkout. Verified with `npm test -- src/agents/specialists.test.ts src/telegram/message-workflow.test.ts src/telegram/onboarding.test.ts`, `npm run typecheck`, `npm test` (12 files / 51 tests), `npm run build`, `npm run smoke:m6` with escalation for tsx IPC, `npm run smoke:m5` with escalation for tsx IPC, and `git diff --check`. Supabase MCP live schema verification was attempted but blocked by MCP auth required; no schema migration was added in this slice.
+- 2026-05-02: Completed M7 observability/eval/demo slice after re-reading local product/agent/observability docs, checking current OpenAI tracing docs, and scanning the Supabase changelog. Added non-blocking sanitized `agent_events` writes across message intake, STT, agent runs, cart build, upsell, approval, checkout, and tracking; correlated event rows with message, agent run, cart session, and order row IDs where available; added M7 eval fixtures, `smoke:m7`, and `docs/m7-demo-checklist.md`. Verified with `npm run typecheck`, `npm test -- src/telegram/message-workflow.test.ts`, `npm test` (12 files / 51 tests), `npm run build`, `npm run smoke:m7` with escalation for tsx IPC, `npm run smoke:m6` with escalation for tsx IPC, and `git diff --check`.
+- 2026-05-02: Diagnosed the Render deploy failure via Render logs and confirmed the runtime was exiting with `MODULE_NOT_FOUND` for `dist/index.js`. The local build emits `dist/src/index.js`, so the start script is being corrected to match the compiled entrypoint.
+- 2026-05-02: Verified the Render startup fix locally. `npm run build`, `npm run typecheck`, and `npm test` passed; `dist/src/index.js` exists; `node dist/src/index.js` starts without the previous module-not-found error when provided production-shaped environment variables; `npm run smoke:m7` and `npm run smoke:m6` passed with escalation for tsx IPC.
 
 ## Commit / Push History
 
@@ -138,6 +146,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-01: Agent created and pushed a docs-only tracker follow-up on `main` recording the Telegram voice STT smoke push state.
 - 2026-05-02: Agent created and pushed M6 cart approval checkout commit `f1ce506` on `main` covering group intake tracker verification, live Swiggy M6 doc recheck, revisioned cart approval callbacks, cart build through local Instamart tools, Supabase cart/order state, guarded approval checkout, and this tracker.
 - 2026-05-02: Agent created and pushed M6 add-more completion commit `cb3c794` on `main` covering `cart_addition_agent`, timed add-more state, full-cart replacement revision rebuild, `smoke:m6`, M6 completion, and this tracker.
+- 2026-05-02: Agent created and pushed M7 observability commit on `main` covering `agent_events` writes, event/order correlation, M7 eval fixtures, `smoke:m7`, demo checklist, and this tracker.
 
 ## Milestone Update Template
 
