@@ -484,6 +484,67 @@ describe("TelegramMessageWorkflowService", () => {
     });
   });
 
+  it("builds a cart from an owner direct purchase request", async () => {
+    const repository = new FakeRepository();
+    const encryptionSecret = "m6-secret";
+    repository.swiggyConnection = {
+      id: "swiggy-connection-1",
+      encryptedAccessToken: encryptSecret("fake-swiggy-token", encryptionSecret),
+    };
+    const speech = new FakeSpeechProvider();
+    const runner = new FakeRunner([
+      {
+        intent: "direct_purchase_request",
+        confidence: 0.92,
+        language: "hinglish",
+        reason: "Owner asked to buy groceries directly.",
+        requiresClarification: false,
+      },
+      { items: [{ name: "rice", quantity: 1, unit: "kg", confidence: 0.9 }], requiresClarification: false },
+      {
+        addressId: "addr_home",
+        items: [{ requestedName: "rice", searchQuery: "rice", selectedSpinId: "spin_rice_1kg", quantity: 1 }],
+      },
+    ]);
+    const workflow = new TelegramMessageWorkflowService(
+      repository,
+      new OpenAISpecialistAgents({ runner }),
+      speech,
+      speech,
+      new FakeVoiceDownloader(),
+      { instamartClient: new LocalInstamartMcpStub(), encryptionSecret },
+    );
+
+    const actions = await workflow.handleMessage({
+      chat,
+      member: { id: "member-owner", householdId: "household-1", telegramUserId: "user-owner", role: "owner" },
+      messageEventId: "message-event-direct-buy",
+      message: textMessage("please buy 1 kg rice from groceries"),
+    });
+
+    expect(actions).toEqual([
+      expect.objectContaining({
+        type: "send_cart_approval_card",
+        cartSessionId: "cart-1",
+        revision: 1,
+        text: expect.stringContaining("Owner approval is required before checkout."),
+      }),
+    ]);
+    expect(repository.cartSessions[0]).toMatchObject({ status: "approval_pending", revision: 1 });
+    expect(repository.cartItems).toEqual([
+      expect.objectContaining({
+        requestedName: "rice",
+        spinId: "spin_rice_1kg",
+        quantity: 1,
+      }),
+    ]);
+    expect(repository.agentRuns.map((run) => [run.agentName, run.intent])).toEqual([
+      ["message_intent_agent", "direct_purchase_request"],
+      ["missing_items_agent", undefined],
+      ["cart_planner_agent", undefined],
+    ]);
+  });
+
   it("opens one add-more window and rebuilds a full replacement cart at the next revision", async () => {
     const repository = new FakeRepository();
     const encryptionSecret = "m6-secret";
@@ -589,7 +650,7 @@ describe("TelegramMessageWorkflowService", () => {
     ]);
   });
 
-  it("rejects stale approval callbacks and checks out only the latest revision", async () => {
+  it("ignores non-owner approvals, rejects stale owner approvals, and checks out only the latest owner-approved revision", async () => {
     const repository = new FakeRepository();
     const encryptionSecret = "m6-secret";
     repository.swiggyConnection = {
@@ -623,6 +684,23 @@ describe("TelegramMessageWorkflowService", () => {
       workflow.handleCartApproval({
         chat,
         member: { id: "member-flatmate", householdId: "household-1", telegramUserId: "user-flatmate", role: "flatmate" },
+        callbackQueryId: "cb-flatmate",
+        cartSessionId: "cart-1",
+        revision: 2,
+      }),
+    ).resolves.toEqual([
+      {
+        type: "answer_callback",
+        callbackQueryId: "cb-flatmate",
+        text: "Only the owner can approve checkout.",
+      },
+    ]);
+    expect(repository.cartSessions[0]?.status).toBe("approval_pending");
+
+    await expect(
+      workflow.handleCartApproval({
+        chat,
+        member: { id: "member-owner", householdId: "household-1", telegramUserId: "user-owner", role: "owner" },
         callbackQueryId: "cb-stale",
         cartSessionId: "cart-1",
         revision: 1,
@@ -637,7 +715,7 @@ describe("TelegramMessageWorkflowService", () => {
 
     const actions = await workflow.handleCartApproval({
       chat,
-      member: { id: "member-flatmate", householdId: "household-1", telegramUserId: "user-flatmate", role: "flatmate" },
+      member: { id: "member-owner", householdId: "household-1", telegramUserId: "user-owner", role: "owner" },
       callbackQueryId: "cb-ok",
       cartSessionId: "cart-1",
       revision: 2,
@@ -665,6 +743,7 @@ describe("TelegramMessageWorkflowService", () => {
       }),
     ]);
     expect(repository.agentEvents.map((event) => event.eventType)).toEqual([
+      "approval_rejected",
       "approval_rejected",
       "approval_received",
       "checkout_started",

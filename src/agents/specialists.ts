@@ -152,6 +152,8 @@ function createSpecialistAgents(model?: string): Record<SpecialistAgentName, Any
         "Classify one sanitized Telegram message or voice transcript for Flatmeal.",
         "Return exactly one documented intent. Do not decide permissions, workflow state, checkout, retries, cart truth, OAuth, address, or order state.",
         "Use senderRole and activeWorkflow only as context; backend code will validate whether the intent can be acted on.",
+        "Use flatmate_meal_request when owner/flatmate asks for a dish to be cooked. Use direct_purchase_request when owner/flatmate clearly asks to buy/order grocery items directly.",
+        "Use cook_restock_request when the cook says ingredients or groceries are running out. Use ignore for casual grocery/Swiggy mentions without a purchase ask.",
       ].join(" "),
       tools: [],
       outputType: intentEnvelopeSchema,
@@ -181,7 +183,7 @@ function createSpecialistAgents(model?: string): Record<SpecialistAgentName, Any
       ...base,
       name: "missing_items_agent",
       instructions: [
-        "Extract missing grocery items from a cook reply or restock request.",
+        "Extract grocery items from a cook reply, cook restock request, or direct owner/flatmate purchase request.",
         "Include quantity and unit only when present or clearly implied; ask for clarification when the message is too ambiguous.",
         "Do not call tools and do not build a cart.",
       ].join(" "),

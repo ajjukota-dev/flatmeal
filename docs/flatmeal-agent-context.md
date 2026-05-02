@@ -13,7 +13,7 @@ The MVP v1 surface is the household Telegram group:
 5. The cook replies with what needs to be ordered or what is missing.
 6. The backend builds a Swiggy Instamart cart through a local MCP-compatible stub.
 7. The bot sends a cart preview with an approval button.
-8. Checkout happens only after a flatmate/owner approves the latest cart revision.
+8. Checkout happens only after the owner approves the latest cart revision.
 
 This is a working Telegram-first MVP, not a mobile app prototype.
 
@@ -91,7 +91,7 @@ Flatmate sends voice/text in group
   → Backend builds Swiggy cart through local MCP stub
   → Optional free-delivery/add-more window
   → Bot sends cart preview + Approve button
-  → Flatmate/owner approves latest cart revision
+  → Owner approves latest cart revision
   → Checkout
   → Bot posts order confirmation in group
 ```
@@ -116,7 +116,7 @@ Cook sends voice/text in group
   → Build cart
   → Optional free-delivery/add-more window
   → Send cart preview + Approve button
-  → Flatmate/owner approves
+  → Owner approves
   → Checkout
   → Confirm order in group
 ```
@@ -131,7 +131,22 @@ Cook sends voice/text: "chawal khatam, dahi nahi hai"
   → Build cart
   → Optional free-delivery/add-more window
   → Send cart preview + Approve button
-  → Flatmate/owner approves
+  → Owner approves
+  → Checkout
+  → Confirm order in group
+```
+
+## Case 4: Owner/Flatmate Direct Purchase Request
+
+```text
+Owner or flatmate clearly asks to buy/order grocery items
+  → Sarvam STT if voice
+  → OpenAI agent classifies direct_purchase_request
+  → OpenAI agent extracts grocery items
+  → Build or update cart
+  → Optional free-delivery/add-more window
+  → Send cart preview + Approve button
+  → Owner approves
   → Checkout
   → Confirm order in group
 ```
@@ -143,6 +158,7 @@ OpenAI agent must return exactly one intent for relevant messages:
 - `flatmate_meal_request`: flatmate asks to cook/eat something.
 - `cook_meal_missing_items`: cook reports meal plus required/missing items.
 - `cook_restock_request`: cook asks only for grocery restock.
+- `direct_purchase_request`: owner or flatmate clearly asks to buy/order grocery items directly.
 - `cook_question_to_flatmates`: cook asks what to cook or asks a clarification.
 - `flatmate_cart_addition`: flatmate adds items during an active add-more window.
 - `cart_approval_context_message`: user asks about cart/order state.
@@ -157,6 +173,7 @@ type ParsedMessageIntent =
   | "flatmate_meal_request"
   | "cook_meal_missing_items"
   | "cook_restock_request"
+  | "direct_purchase_request"
   | "cook_question_to_flatmates"
   | "flatmate_cart_addition"
   | "cart_approval_context_message"
@@ -208,7 +225,7 @@ Invalid structured output must stop the workflow and create a `run_failed` event
 ## Approval And Checkout Rules
 
 - Checkout must never happen automatically.
-- Only `flatmate` or `owner` roles can approve.
+- Only the `owner` role can approve.
 - Approval callback payload must include `cartSessionId` and `revision`.
 - Backend must reject stale approval callbacks.
 - Backend must reject approval if cart status is not `approval_pending`.

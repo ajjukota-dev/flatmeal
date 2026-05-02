@@ -6,6 +6,7 @@ export const parsedMessageIntentSchema = z.enum([
   "flatmate_meal_request",
   "cook_meal_missing_items",
   "cook_restock_request",
+  "direct_purchase_request",
   "cook_question_to_flatmates",
   "flatmate_cart_addition",
   "cart_approval_context_message",

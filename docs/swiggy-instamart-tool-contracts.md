@@ -122,7 +122,7 @@ Flatmeal-specific gate:
 ```text
 get_cart
   → Telegram cart preview with items, bill, payment method, address, revision
-  → latest owner/flatmate approval
+  → latest owner approval
   → checkout
 ```
 
@@ -514,7 +514,7 @@ Shared note: `search_products` and `your_go_to_items` both return products with 
   - fails on duplicate checkout.
   - calls `get_cart` before checkout in workflow tests.
   - rejects unavailable `paymentMethod`.
-  - succeeds after latest owner/flatmate approval.
+  - succeeds after latest owner approval.
   - preserves Swiggy/Instamart-branded success message.
   - uncertain 5xx path checks `get_orders` before retry.
 

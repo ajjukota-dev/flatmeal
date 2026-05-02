@@ -124,6 +124,10 @@ export class TelegramMessageWorkflowService {
       return this.handleCookMissingItems(input, messageText.text, traceBase);
     }
 
+    if (intent.intent === "direct_purchase_request" && (input.member.role === "owner" || input.member.role === "flatmate")) {
+      return this.handleCookMissingItems(input, messageText.text, traceBase);
+    }
+
     return [];
   }
 
@@ -140,15 +144,15 @@ export class TelegramMessageWorkflowService {
       text,
     });
 
-    if (!input.member || (input.member.role !== "owner" && input.member.role !== "flatmate")) {
+    if (!input.member || input.member.role !== "owner") {
       await this.recordEventForChat(input.chat, {
         eventType: "approval_rejected",
         cartSessionId: input.cartSessionId,
         status: "warning",
-        userSafeMessage: "Only owner or flatmate can approve checkout.",
-        sanitizedPayload: { revision: input.revision, reason: "role_not_allowed" },
+        userSafeMessage: "Only the owner can approve checkout.",
+        sanitizedPayload: { revision: input.revision, reason: "role_not_owner" },
       });
-      return [answer("Only owner or flatmate can approve checkout.")];
+      return [answer("Only the owner can approve checkout.")];
     }
 
     const cartSession = await this.repository.findCartSession(input.cartSessionId);
@@ -1264,7 +1268,7 @@ function formatCartApprovalText(input: { revision: number; address: ToolAddress;
     ...items.map((item) => `- ${item.name ?? item.spinId} x ${item.quantity}`),
     `Total: ${formatRupees(bill.grandTotal)}`,
     `Payment: ${paymentMethods.join(", ") || "not specified by docs"}`,
-    "Approve only if this latest cart looks correct.",
+    "Owner approval is required before checkout.",
   ];
   return lines.join("\n");
 }

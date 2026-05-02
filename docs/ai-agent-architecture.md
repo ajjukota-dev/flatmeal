@@ -173,6 +173,7 @@ Restrictions:
 - `flatmate_meal_request`: flatmate asks to cook/eat something.
 - `cook_meal_missing_items`: cook reports meal plus required/missing items.
 - `cook_restock_request`: cook asks only for grocery restock.
+- `direct_purchase_request`: owner or flatmate clearly asks to buy/order grocery items directly.
 - `cook_question_to_flatmates`: cook asks what to cook or asks a clarification.
 - `flatmate_cart_addition`: flatmate adds items during an active add-more window.
 - `cart_approval_context_message`: user asks about cart/order state.
@@ -191,6 +192,7 @@ type ParsedMessageIntent =
   | "flatmate_meal_request"
   | "cook_meal_missing_items"
   | "cook_restock_request"
+  | "direct_purchase_request"
   | "cook_question_to_flatmates"
   | "flatmate_cart_addition"
   | "cart_approval_context_message"
@@ -262,10 +264,10 @@ flatmate_meal_request
   → wait_for_cook_reply
 ```
 
-Cook missing items or restock:
+Cook missing items/restock or direct grocery purchase:
 
 ```text
-cook_reply_or_restock
+cook_reply_restock_or_direct_purchase
   → missing_items_extracted
   → cart_session_created
   → address_selected_or_requested
@@ -332,6 +334,7 @@ All tool wrappers must enforce:
 - Active household.
 - Valid fake/real Swiggy connection.
 - Latest cart revision.
+- Owner-only approval before checkout.
 - Approval present before checkout.
 - No stale approval callback.
 - No duplicate checkout for an already checked-out cart session.

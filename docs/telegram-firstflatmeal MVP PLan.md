@@ -82,7 +82,7 @@ Flatmate sends voice/text in group
   → Bot checks cart/free-delivery threshold
   → Optional 2-minute add-more window
   → Bot sends cart preview + Approve button
-  → Any flatmate/owner taps Approve
+  → Owner taps Approve
   → Backend validates latest cart revision
   → Checkout
   → Order confirmation posted in group
@@ -98,7 +98,7 @@ Cook sends voice/text in group
   → Build cart
   → Optional free-delivery/add-more window
   → Send cart preview + Approve button
-  → Flatmate/owner approves
+  → Owner approves
   → Checkout
   → Confirm order in group
 ```
@@ -112,7 +112,21 @@ Cook sends voice/text: "chawal khatam, dahi nahi hai"
   → Build cart
   → Optional free-delivery/add-more window
   → Send cart preview + Approve button
-  → Flatmate/owner approves
+  → Owner approves
+  → Checkout
+  → Confirm order in group
+```
+
+## Case 4: Owner/Flatmate Direct Purchase Request
+```text
+Owner or flatmate clearly asks to buy/order grocery items
+  → Sarvam STT if voice
+  → OpenAI agent classifies as direct_purchase_request
+  → Extract grocery items directly
+  → Build or update cart
+  → Optional free-delivery/add-more window
+  → Send cart preview + Approve button
+  → Owner approves
   → Checkout
   → Confirm order in group
 ```
@@ -122,6 +136,7 @@ OpenAI agent should return one structured intent per relevant message:
 - `flatmate_meal_request`: flatmate asks to cook/eat something.
 - `cook_meal_missing_items`: cook reports meal plus required/missing items.
 - `cook_restock_request`: cook asks only for grocery restock, no meal context.
+- `direct_purchase_request`: owner or flatmate clearly asks to buy/order grocery items directly.
 - `cook_question_to_flatmates`: cook asks what to cook or asks a clarification.
 - `flatmate_cart_addition`: flatmate adds items during active add-more window.
 - `cart_approval_context_message`: user asks about cart/order state.
@@ -135,6 +150,7 @@ type ParsedMessageIntent =
   | "flatmate_meal_request"
   | "cook_meal_missing_items"
   | "cook_restock_request"
+  | "direct_purchase_request"
   | "cook_question_to_flatmates"
   | "flatmate_cart_addition"
   | "cart_approval_context_message"
@@ -184,7 +200,7 @@ type CartRevision = {
 
 ## Approval + Checkout Rules
 - Checkout must never happen automatically.
-- Only `flatmate` or `owner` roles can approve.
+- Only the `owner` role can approve.
 - Approval callback payload must include `cartSessionId` and `revision`.
 - Backend must reject stale approval callbacks.
 - Backend must reject approval if cart status is not `approval_pending`.
@@ -259,7 +275,7 @@ get_addresses → search_products → update_cart → get_cart → checkout → 
 Swiggy access review expects more than a sandbox mock. The MVP must be demoed as a concrete real-user use case with respectful user confirmation, safe auth, safe retries, realistic QPS expectations, HTTPS redirects, and minimal PII storage.
 
 Build the demo so the application can provide:
-- Integration name and one-paragraph use case: Telegram-first food coordination for shared flats with cook/flatmate approval.
+- Integration name and one-paragraph use case: Telegram-first food coordination for shared flats with cook/flatmate requests and owner approval.
 - Short video: bot added to real Telegram group, roles selected, fake Swiggy connected, voice request processed, cart built, latest revision approved, checkout simulated.
 - Redirect URIs: exact-match HTTPS production callback plus `http://localhost` only for local dev.
 - Requested server: `instamart`; scopes: `mcp:tools` initially, with `mcp:resources`/`mcp:prompts` only if actually used.
@@ -350,9 +366,10 @@ Supabase implementation requirements:
 - No slash-command onboarding.
 
 ## Test Plan
-- Case 1 E2E: flatmate voice meal request → cook prompt text+voice → cook reply → cart → free-delivery add-more → approval → checkout.
-- Case 2 E2E: cook sends meal+missing items → skip cook ping → cart → approval → checkout.
-- Case 3 E2E: cook sends restock request → cart → approval → checkout.
+- Case 1 E2E: flatmate voice meal request → cook prompt text+voice → cook reply → cart → free-delivery add-more → owner approval → checkout.
+- Case 2 E2E: cook sends meal+missing items → skip cook ping → cart → owner approval → checkout.
+- Case 3 E2E: cook sends restock request → cart → owner approval → checkout.
+- Case 4 E2E: owner/flatmate directly requests groceries → cart → owner approval → checkout.
 - Telegram tests: voice note ingestion, text ingestion, callback approval, stale button rejection, privacy-mode setup detection.
 - Onboarding tests: bot-added household creation, setup card buttons, owner/cook/flatmate role capture, cook language selection, new-member role prompt.
 - OpenAI agent tests: classify all intent types, reject unrelated group chatter, extract multilingual missing items, and emit valid structured outputs.

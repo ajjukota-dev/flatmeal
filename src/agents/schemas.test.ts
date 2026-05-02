@@ -21,6 +21,16 @@ describe("agent structured output schemas", () => {
 
     expect(
       intentEnvelopeSchema.parse({
+        intent: "direct_purchase_request",
+        confidence: 0.89,
+        language: "hinglish",
+        reason: "Owner clearly asked to buy grocery items.",
+        requiresClarification: false,
+      }),
+    ).toMatchObject({ intent: "direct_purchase_request" });
+
+    expect(
+      intentEnvelopeSchema.parse({
         intent: "flatmate_meal_request",
         confidence: 0.91,
         language: "hinglish",

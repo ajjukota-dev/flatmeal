@@ -292,7 +292,7 @@ assert(repository.cartItems.filter((item) => item.revision === 2).length === 2, 
 
 const checkoutActions = await workflow.handleCartApproval({
   chat,
-  member: { id: "member-flatmate", householdId: "household-smoke", telegramUserId: "flatmate", role: "flatmate" },
+  member: { id: "member-owner", householdId: "household-smoke", telegramUserId: "owner", role: "owner" },
   callbackQueryId: "callback-smoke",
   cartSessionId: "cart-smoke",
   revision: 2,
@@ -336,4 +336,4 @@ assert(
   "M6 smoke specialist sequence changed unexpectedly",
 );
 
-console.log("PASS local M6 flow: cook restock -> add-more window -> flatmate addition -> revisioned approval -> guarded checkout");
+console.log("PASS local M6 flow: cook restock -> add-more window -> flatmate addition -> revisioned owner approval -> guarded checkout");
