@@ -123,12 +123,12 @@ export class OpenAISpecialistAgents {
 
   async extractMissingItems(input: MissingItemsInput, trace: AgentTraceContext = {}): Promise<MissingItemsExtraction> {
     const output = await this.runAgent("missing_items_agent", input, trace);
-    return missingItemsExtractionSchema.parse(output);
+    return normalizeMissingItems(missingItemsExtractionSchema.parse(output));
   }
 
   async extractCartAddition(input: MissingItemsInput, trace: AgentTraceContext = {}): Promise<MissingItemsExtraction> {
     const output = await this.runAgent("cart_addition_agent", input, trace);
-    return missingItemsExtractionSchema.parse(output);
+    return normalizeMissingItems(missingItemsExtractionSchema.parse(output));
   }
 
   async planCart(input: CartPlannerInput, trace: AgentTraceContext = {}): Promise<CartBuildPlan> {
@@ -236,6 +236,19 @@ function buildRunOptions(agentName: SpecialistAgentName, trace: AgentTraceContex
 
 function pruneMetadata(metadata: Record<string, string | undefined>): Record<string, string> {
   return Object.fromEntries(Object.entries(metadata).filter((entry): entry is [string, string] => entry[1] !== undefined));
+}
+
+function normalizeMissingItems(output: MissingItemsExtraction): MissingItemsExtraction {
+  return {
+    ...output,
+    items: output.items.map((item) => {
+      if (item.quantity === 0) {
+        const { quantity: _quantity, ...rest } = item;
+        return rest;
+      }
+      return item;
+    }),
+  };
 }
 
 export type SpecialistAgentOutput<TSchema extends z.ZodType> = z.infer<TSchema>;

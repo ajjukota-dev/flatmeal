@@ -577,7 +577,7 @@ export class SupabaseTelegramRepository implements TelegramOnboardingRepository 
   async recordOrder(input: OrderInsert): Promise<{ id: string }> {
     const result = await this.supabase
       .from("orders")
-      .insert({
+      .upsert({
         household_id: input.householdId,
         cart_session_id: input.cartSessionId,
         swiggy_connection_id: input.swiggyConnectionId,
@@ -586,7 +586,7 @@ export class SupabaseTelegramRepository implements TelegramOnboardingRepository 
         status: input.status,
         total_minor: input.totalMinor,
         tracking_state: input.trackingState,
-      })
+      }, { onConflict: "local_order_id" })
       .select("id")
       .single<RowId>();
 

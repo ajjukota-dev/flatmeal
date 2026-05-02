@@ -116,6 +116,18 @@ describe("OpenAISpecialistAgents", () => {
     ]);
   });
 
+  it("normalizes zero quantities from extraction outputs before workflow code consumes them", async () => {
+    const runner = new FakeRunner([
+      { items: [{ name: "onion", quantity: 0, confidence: 0.82 }], requiresClarification: false },
+    ]);
+    const agents = new OpenAISpecialistAgents({ runner });
+
+    await expect(agents.extractMissingItems({ text: "order onions" })).resolves.toEqual({
+      items: [{ name: "onion", confidence: 0.82 }],
+      requiresClarification: false,
+    });
+  });
+
   it("rejects invalid model output instead of letting workflow state consume it", async () => {
     const runner = new FakeRunner([
       {

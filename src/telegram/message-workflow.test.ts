@@ -484,6 +484,51 @@ describe("TelegramMessageWorkflowService", () => {
     });
   });
 
+  it("fails safely in Telegram when an agent output cannot be used", async () => {
+    const repository = new FakeRepository();
+    const runner = new FakeRunner([
+      {
+        intent: "direct_purchase_request",
+        confidence: 0.92,
+        language: "en",
+        reason: "Owner asked to buy groceries directly.",
+        requiresClarification: false,
+      },
+      {
+        items: [{ name: "", confidence: 0.9 }],
+        requiresClarification: false,
+      },
+    ]);
+    const workflow = new TelegramMessageWorkflowService(
+      repository,
+      new OpenAISpecialistAgents({ runner }),
+      new FakeSpeechProvider(),
+      new FakeSpeechProvider(),
+      new FakeVoiceDownloader(),
+    );
+
+    await expect(
+      workflow.handleMessage({
+        chat,
+        member: { id: "member-owner", householdId: "household-1", telegramUserId: "user-owner", role: "owner" },
+        messageEventId: "message-event-bad-output",
+        message: textMessage("order vegetables"),
+      }),
+    ).resolves.toEqual([
+      {
+        type: "send_text_message",
+        chatId: "-100",
+        text: "I could not process that safely. Please resend with clear item names and quantities.",
+      },
+    ]);
+    expect(repository.agentEvents.map((event) => event.eventType)).toEqual([
+      "message_intake",
+      "intent_classified",
+      "agent_run_failed",
+      "workflow_failed",
+    ]);
+  });
+
   it("builds a cart from an owner direct purchase request", async () => {
     const repository = new FakeRepository();
     const encryptionSecret = "m6-secret";
@@ -737,6 +782,7 @@ describe("TelegramMessageWorkflowService", () => {
     expect(repository.orders).toEqual([
       expect.objectContaining({
         cartSessionId: "cart-1",
+        localOrderId: "cart-1:IM-000001",
         swiggyConnectionId: "swiggy-connection-1",
         swiggyOrderId: "IM-000001",
         status: "confirmed",

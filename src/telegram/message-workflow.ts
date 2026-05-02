@@ -69,66 +69,85 @@ export class TelegramMessageWorkflowService {
       return [];
     }
 
-    const messageText = await this.readMessageText(input);
-    if (!messageText?.text.trim()) {
-      return [];
-    }
+    try {
+      const messageText = await this.readMessageText(input);
+      if (!messageText?.text.trim()) {
+        return [];
+      }
 
-    const traceBase = {
-      householdId: input.chat.householdId,
-      telegramChatId: input.chat.telegramChatId,
-      messageEventId: input.messageEventId,
-    };
-    const activeCart = await this.repository.findActiveCartSession(input.chat.householdId);
-    const activeWorkflow = activeCart?.status ?? "idle";
-    const intentInput: IntentClassificationInput = {
-      text: messageText.text,
-      senderRole: input.member.role,
-      activeWorkflow,
-    };
-    const intent = await this.runRecordedAgent(
-      "message_intent_agent",
-      input,
-      {
-        source: messageText.source,
-        textLength: messageText.text.length,
+      const traceBase = {
+        householdId: input.chat.householdId,
+        telegramChatId: input.chat.telegramChatId,
+        messageEventId: input.messageEventId,
+      };
+      const activeCart = await this.repository.findActiveCartSession(input.chat.householdId);
+      const activeWorkflow = activeCart?.status ?? "idle";
+      const intentInput: IntentClassificationInput = {
+        text: messageText.text,
         senderRole: input.member.role,
         activeWorkflow,
-      },
-      (trace) => this.agents.classifyMessage(intentInput, trace),
-      sanitizeIntent,
-      traceBase,
-    );
+      };
+      const intent = await this.runRecordedAgent(
+        "message_intent_agent",
+        input,
+        {
+          source: messageText.source,
+          textLength: messageText.text.length,
+          senderRole: input.member.role,
+          activeWorkflow,
+        },
+        (trace) => this.agents.classifyMessage(intentInput, trace),
+        sanitizeIntent,
+        traceBase,
+      );
 
-    if (intent.requiresClarification && intent.clarificationQuestion) {
-      return [{ type: "send_text_message", chatId: input.chat.telegramChatId, text: intent.clarificationQuestion }];
-    }
-
-    if (activeCart?.status === "upsell_open") {
-      if (isExpired(activeCart.expiresAt)) {
-        return this.finalizeUpsellCart(input.chat, activeCart);
+      if (intent.requiresClarification && intent.clarificationQuestion) {
+        return [{ type: "send_text_message", chatId: input.chat.telegramChatId, text: intent.clarificationQuestion }];
       }
-      if (
-        intent.intent === "flatmate_cart_addition"
-        && (input.member.role === "owner" || input.member.role === "flatmate")
-      ) {
-        return this.handleCartAddition(input, messageText.text, activeCart, traceBase);
+
+      if (activeCart?.status === "upsell_open") {
+        if (isExpired(activeCart.expiresAt)) {
+          return await this.finalizeUpsellCart(input.chat, activeCart);
+        }
+        if (
+          intent.intent === "flatmate_cart_addition"
+          && (input.member.role === "owner" || input.member.role === "flatmate")
+        ) {
+          return await this.handleCartAddition(input, messageText.text, activeCart, traceBase);
+        }
       }
-    }
 
-    if (intent.intent === "flatmate_meal_request" && (input.member.role === "flatmate" || input.member.role === "owner")) {
-      return this.handleFlatmateMealRequest(input, messageText.text, traceBase);
-    }
+      if (intent.intent === "flatmate_meal_request" && (input.member.role === "flatmate" || input.member.role === "owner")) {
+        return await this.handleFlatmateMealRequest(input, messageText.text, traceBase);
+      }
 
-    if ((intent.intent === "cook_meal_missing_items" || intent.intent === "cook_restock_request") && input.member.role === "cook") {
-      return this.handleCookMissingItems(input, messageText.text, traceBase);
-    }
+      if ((intent.intent === "cook_meal_missing_items" || intent.intent === "cook_restock_request") && input.member.role === "cook") {
+        return await this.handleCookMissingItems(input, messageText.text, traceBase);
+      }
 
-    if (intent.intent === "direct_purchase_request" && (input.member.role === "owner" || input.member.role === "flatmate")) {
-      return this.handleCookMissingItems(input, messageText.text, traceBase);
-    }
+      if (intent.intent === "direct_purchase_request" && (input.member.role === "owner" || input.member.role === "flatmate")) {
+        return await this.handleCookMissingItems(input, messageText.text, traceBase);
+      }
 
-    return [];
+      return [];
+    } catch (error) {
+      await this.recordEvent(input, {
+        eventType: "workflow_failed",
+        status: "failed",
+        retryable: false,
+        userSafeMessage: "Message processing failed safely.",
+        sanitizedPayload: {
+          errorSummary: error instanceof Error ? error.message : "Telegram message workflow failed",
+        },
+      });
+      return [
+        {
+          type: "send_text_message",
+          chatId: input.chat.telegramChatId,
+          text: "I could not process that safely. Please resend with clear item names and quantities.",
+        },
+      ];
+    }
   }
 
   async handleCartApproval(input: {
@@ -1032,7 +1051,7 @@ export class TelegramMessageWorkflowService {
         householdId: input.householdId,
         cartSessionId: input.cartSessionId,
         swiggyConnectionId: input.swiggyConnectionId,
-        localOrderId: order.orderId,
+        localOrderId: `${input.cartSessionId}:${order.orderId}`,
         swiggyOrderId: order.orderId,
         status: "confirmed",
         totalMinor: order.bill?.grandTotal === undefined ? undefined : Math.round(order.bill.grandTotal * 100),

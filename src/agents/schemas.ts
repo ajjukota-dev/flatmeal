@@ -49,7 +49,7 @@ export const cookPromptSchema = z
 export const missingItemSchema = z
   .object({
     name: z.string().trim().min(1),
-    quantity: z.number().positive().optional(),
+    quantity: z.number().nonnegative().optional(),
     unit: z.string().trim().min(1).optional(),
     confidence: z.number().min(0).max(1),
   })

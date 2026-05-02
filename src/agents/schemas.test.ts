@@ -97,6 +97,13 @@ describe("agent structured output schemas", () => {
       }),
     ).toMatchObject({ items: [{ name: "rice" }] });
 
+    expect(
+      missingItemsExtractionSchema.parse({
+        items: [{ name: "onion", quantity: 0, confidence: 0.72 }],
+        requiresClarification: false,
+      }),
+    ).toMatchObject({ items: [{ name: "onion", quantity: 0 }] });
+
     expect(() =>
       missingItemsExtractionSchema.parse({
         items: [{ name: "rice", confidence: 0.88, swiggyOtp: "123456" }],
