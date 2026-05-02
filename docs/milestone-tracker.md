@@ -76,14 +76,14 @@ Persistent progress tracker for coding agents. Update this file after every mean
 
 ## Next Tasks
 
-1. Start backend with the real Telegram bot token, provider keys, Supabase config, encryption secret, and public HTTPS webhook URL.
+1. Set the Telegram webhook to `https://flatmeal.onrender.com/telegram/webhook`.
 2. Run the `docs/m7-demo-checklist.md` flow in the real Telegram group and inspect Supabase timeline rows.
 3. Record or rehearse the M8 access-review video: onboarding, fake Swiggy connect, voice request, cook reply, add-more, approval, checkout, and trace/event evidence.
 4. Document any live-demo blockers and final Swiggy review checklist gaps.
 
 ## Blockers
 
-- Render deployment was failing because the service start script expected `dist/index.js`, while the TypeScript build emits `dist/src/index.js`. The start script has been corrected to `node dist/src/index.js`; the next Render deploy needs to confirm healthy startup.
+- Telegram webhook update is still needed for full live E2E. Local shell access to `api.telegram.org` was blocked by the execution environment after Render deployment was fixed, so `setWebhook` could not be completed from this session.
 - Future implementation requires real API keys/config from the user:
   - Telegram bot token.
   - OpenAI API key.
@@ -124,6 +124,8 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-02: Completed M7 observability/eval/demo slice after re-reading local product/agent/observability docs, checking current OpenAI tracing docs, and scanning the Supabase changelog. Added non-blocking sanitized `agent_events` writes across message intake, STT, agent runs, cart build, upsell, approval, checkout, and tracking; correlated event rows with message, agent run, cart session, and order row IDs where available; added M7 eval fixtures, `smoke:m7`, and `docs/m7-demo-checklist.md`. Verified with `npm run typecheck`, `npm test -- src/telegram/message-workflow.test.ts`, `npm test` (12 files / 51 tests), `npm run build`, `npm run smoke:m7` with escalation for tsx IPC, `npm run smoke:m6` with escalation for tsx IPC, and `git diff --check`.
 - 2026-05-02: Diagnosed the Render deploy failure via Render logs and confirmed the runtime was exiting with `MODULE_NOT_FOUND` for `dist/index.js`. The local build emits `dist/src/index.js`, so the start script is being corrected to match the compiled entrypoint.
 - 2026-05-02: Verified the Render startup fix locally. `npm run build`, `npm run typecheck`, and `npm test` passed; `dist/src/index.js` exists; `node dist/src/index.js` starts without the previous module-not-found error when provided production-shaped environment variables; `npm run smoke:m7` and `npm run smoke:m6` passed with escalation for tsx IPC.
+- 2026-05-02: Pushed commit `3fbd87d` and verified Render deploy `dep-d7qvdgcm0tmc73fvj2ig` is live at `https://flatmeal.onrender.com`. Render logs show `npm run start`, `node dist/src/index.js`, `flatmeal backend listening on 10000`, and service live. Public health check returned `{"ok":true,"service":"flatmeal","mode":"production"}`. Render env was updated with production base URLs, Supabase URL, encryption secret, and `NPM_CONFIG_PRODUCTION=false` so TypeScript build dependencies are installed during Render builds.
+- 2026-05-02: Attempted to set the Telegram webhook to the Render URL after checking current Telegram `setWebhook` / `getWebhookInfo` docs. The first local call failed DNS resolution for `api.telegram.org`; the required escalated network call was rejected by the execution environment limit, so live Telegram E2E remains blocked on setting the webhook outside this session.
 
 ## Commit / Push History
 
@@ -147,6 +149,7 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-02: Agent created and pushed M6 cart approval checkout commit `f1ce506` on `main` covering group intake tracker verification, live Swiggy M6 doc recheck, revisioned cart approval callbacks, cart build through local Instamart tools, Supabase cart/order state, guarded approval checkout, and this tracker.
 - 2026-05-02: Agent created and pushed M6 add-more completion commit `cb3c794` on `main` covering `cart_addition_agent`, timed add-more state, full-cart replacement revision rebuild, `smoke:m6`, M6 completion, and this tracker.
 - 2026-05-02: Agent created and pushed M7 observability commit on `main` covering `agent_events` writes, event/order correlation, M7 eval fixtures, `smoke:m7`, demo checklist, and this tracker.
+- 2026-05-02: Agent created and pushed commit `3fbd87d` on `main`, which also corrected the Render start command to `node dist/src/index.js`; Render deployment is live after env fixes.
 
 ## Milestone Update Template
 
