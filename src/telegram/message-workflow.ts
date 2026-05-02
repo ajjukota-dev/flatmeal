@@ -14,6 +14,8 @@ import type { TextToSpeechProvider, SpeechToTextProvider, SarvamTextToSpeechLang
 import type { DownloadedTelegramFile } from "./bot-api.js";
 import type {
   CartItemInsert,
+  StoredCartItem,
+  StoredCartSession,
   StoredHouseholdChat,
   StoredHouseholdMember,
   TelegramOnboardingRepository,
@@ -90,6 +92,18 @@ export class TelegramMessageWorkflowService {
 
     if (intent.requiresClarification && intent.clarificationQuestion) {
       return [{ type: "send_text_message", chatId: input.chat.telegramChatId, text: intent.clarificationQuestion }];
+    }
+
+    if (activeCart?.status === "upsell_open") {
+      if (isExpired(activeCart.expiresAt)) {
+        return this.finalizeUpsellCart(input.chat, activeCart);
+      }
+      if (
+        intent.intent === "flatmate_cart_addition"
+        && (input.member.role === "owner" || input.member.role === "flatmate")
+      ) {
+        return this.handleCartAddition(input, messageText.text, activeCart, traceBase);
+      }
     }
 
     if (intent.intent === "flatmate_meal_request" && (input.member.role === "flatmate" || input.member.role === "owner")) {
@@ -435,6 +449,23 @@ export class TelegramMessageWorkflowService {
 
     const cartItems = buildCartItemRows(plan.items, readCartItems(cart.data.items));
     await this.repository.replaceCartItems({ cartSessionId: cartSession.id, revision: cartSession.revision, items: cartItems });
+
+    const addMoreGap = readAddMoreGap(cart.data.bill);
+    if (addMoreGap !== null) {
+      await this.repository.openCartUpsellWindow({
+        cartSessionId: cartSession.id,
+        revision: cartSession.revision,
+        expiresAt: new Date(Date.now() + 2 * 60 * 1000),
+      });
+      return [
+        {
+          type: "send_text_message",
+          chatId: input.chat.telegramChatId,
+          text: `₹${addMoreGap} more for free delivery — kuch aur chahiye? 2 min.`,
+        },
+      ];
+    }
+
     await this.repository.markCartApprovalPending({ cartSessionId: cartSession.id, revision: cartSession.revision });
 
     return [
@@ -446,6 +477,201 @@ export class TelegramMessageWorkflowService {
         text: formatCartApprovalText({
           revision: cartSession.revision,
           address,
+          cartData: cart.data,
+        }),
+      },
+    ];
+  }
+
+  private async handleCartAddition(
+    input: TelegramMessageWorkflowInput,
+    text: string,
+    cartSession: StoredCartSession,
+    traceBase: AgentTraceContext,
+  ): Promise<TelegramAction[]> {
+    if (!cartSession.selectedAddressId) {
+      return [{ type: "send_text_message", chatId: input.chat.telegramChatId, text: "Cart address is missing." }];
+    }
+
+    const addition = await this.runRecordedAgent(
+      "cart_addition_agent",
+      input,
+      {
+        textLength: text.length,
+        cartSessionId: cartSession.id,
+        cartRevision: cartSession.revision,
+      },
+      (trace) => this.agents.extractCartAddition({ text } satisfies MissingItemsInput, trace),
+      sanitizeMissingItems,
+      { ...traceBase, cartSessionId: cartSession.id, cartRevision: cartSession.revision },
+    );
+
+    if (addition.requiresClarification && addition.clarificationQuestion) {
+      return [{ type: "send_text_message", chatId: input.chat.telegramChatId, text: addition.clarificationQuestion }];
+    }
+    if (addition.items.length === 0) {
+      return [];
+    }
+
+    const connection = await this.repository.findActiveSwiggyConnection(input.chat.householdId);
+    if (!connection) {
+      return [
+        {
+          type: "send_text_message",
+          chatId: input.chat.telegramChatId,
+          text: "Swiggy is not connected for this household. Owner should reconnect Swiggy before I update the cart.",
+        },
+      ];
+    }
+
+    const accessToken = decryptSecret(connection.encryptedAccessToken, this.requireCartOptions().encryptionSecret);
+    const existingItems = await this.repository.findCartItems({
+      cartSessionId: cartSession.id,
+      revision: cartSession.revision,
+    });
+
+    const candidateProducts: Array<{ requestedName: string; products: unknown[] }> = [];
+    for (const item of addition.items) {
+      const search = await this.callInstamart(
+        "search_products",
+        { addressId: cartSession.selectedAddressId, query: item.name },
+        accessToken,
+      );
+      if (!search.success) {
+        return this.cartFailureActions(input.chat.telegramChatId, undefined, `Could not find ${item.name} on Instamart`, search);
+      }
+      candidateProducts.push({ requestedName: item.name, products: readProducts(search.data.products) });
+    }
+
+    const plan = await this.runRecordedAgent(
+      "cart_planner_agent",
+      input,
+      {
+        cartSessionId: cartSession.id,
+        cartRevision: cartSession.revision,
+        addressId: cartSession.selectedAddressId,
+        itemCount: addition.items.length,
+        candidateProductGroups: candidateProducts.length,
+      },
+      (trace) =>
+        this.agents.planCart(
+          {
+            addressId: cartSession.selectedAddressId ?? "",
+            missingItems: addition.items,
+            candidateProducts,
+          },
+          { ...trace, cartSessionId: cartSession.id, cartRevision: cartSession.revision },
+        ),
+      sanitizeCartPlan,
+      { ...traceBase, cartSessionId: cartSession.id, cartRevision: cartSession.revision },
+    );
+
+    const validSpinIds = collectSpinIds(candidateProducts);
+    const invalidSelection = plan.items.find((item) => !validSpinIds.has(item.selectedSpinId));
+    if (invalidSelection) {
+      return [
+        {
+          type: "send_text_message",
+          chatId: input.chat.telegramChatId,
+          text: `I could not safely match ${invalidSelection.requestedName} to an available Instamart variant. Please rephrase the item.`,
+        },
+      ];
+    }
+
+    const mergedItems = mergeCartItems(existingItems, plan.items);
+    const updateCart = await this.callInstamart(
+      "update_cart",
+      {
+        selectedAddressId: cartSession.selectedAddressId,
+        items: mergedItems.map((item) => ({ spinId: item.spinId, quantity: item.quantity })),
+      },
+      accessToken,
+    );
+    if (!updateCart.success) {
+      return this.cartFailureActions(input.chat.telegramChatId, undefined, "Could not update Instamart cart", updateCart);
+    }
+
+    const cart = await this.callInstamart("get_cart", {}, accessToken);
+    if (!cart.success) {
+      return this.cartFailureActions(input.chat.telegramChatId, undefined, "Could not re-read Instamart cart", cart);
+    }
+
+    const nextRevision = cartSession.revision + 1;
+    const moved = await this.repository.moveCartToRevision({
+      cartSessionId: cartSession.id,
+      expectedRevision: cartSession.revision,
+      nextRevision,
+      status: "approval_pending",
+    });
+    if (!moved) {
+      return [{ type: "send_text_message", chatId: input.chat.telegramChatId, text: "Cart changed while updating. Please use the latest cart." }];
+    }
+
+    await this.repository.replaceCartItems({
+      cartSessionId: cartSession.id,
+      revision: nextRevision,
+      items: buildCartItemRows(
+        mergedItems.map((item) => ({ requestedName: item.requestedName, selectedSpinId: item.spinId, quantity: item.quantity })),
+        readCartItems(cart.data.items),
+      ),
+    });
+
+    return [
+      {
+        type: "send_cart_approval_card",
+        chatId: input.chat.telegramChatId,
+        cartSessionId: cartSession.id,
+        revision: nextRevision,
+        text: formatCartApprovalText({
+          revision: nextRevision,
+          address: { id: cartSession.selectedAddressId },
+          cartData: cart.data,
+        }),
+      },
+    ];
+  }
+
+  private async finalizeUpsellCart(chat: StoredHouseholdChat, cartSession: StoredCartSession): Promise<TelegramAction[]> {
+    if (!cartSession.selectedAddressId) {
+      return [{ type: "send_text_message", chatId: chat.telegramChatId, text: "Cart address is missing." }];
+    }
+
+    const connection = await this.repository.findActiveSwiggyConnection(chat.householdId);
+    if (!connection) {
+      return [
+        {
+          type: "send_text_message",
+          chatId: chat.telegramChatId,
+          text: "Swiggy is not connected for this household. Owner should reconnect Swiggy before checkout.",
+        },
+      ];
+    }
+
+    const accessToken = decryptSecret(connection.encryptedAccessToken, this.requireCartOptions().encryptionSecret);
+    const cart = await this.callInstamart("get_cart", {}, accessToken);
+    if (!cart.success) {
+      return this.cartFailureActions(chat.telegramChatId, undefined, "Could not re-read Instamart cart", cart);
+    }
+
+    const moved = await this.repository.moveCartToRevision({
+      cartSessionId: cartSession.id,
+      expectedRevision: cartSession.revision,
+      nextRevision: cartSession.revision,
+      status: "approval_pending",
+    });
+    if (!moved) {
+      return [{ type: "send_text_message", chatId: chat.telegramChatId, text: "Cart changed while finalizing. Please use the latest cart." }];
+    }
+
+    return [
+      {
+        type: "send_cart_approval_card",
+        chatId: chat.telegramChatId,
+        cartSessionId: cartSession.id,
+        revision: cartSession.revision,
+        text: formatCartApprovalText({
+          revision: cartSession.revision,
+          address: { id: cartSession.selectedAddressId },
           cartData: cart.data,
         }),
       },
@@ -745,6 +971,21 @@ function readBill(value: unknown): ToolBill {
   };
 }
 
+function readAddMoreGap(value: unknown): number | null {
+  const bill = readBill(value);
+  if (
+    bill.itemTotal === undefined
+    || bill.freeDeliveryThreshold === undefined
+    || bill.deliveryFee === undefined
+    || bill.deliveryFee <= 0
+  ) {
+    return null;
+  }
+
+  const gap = bill.freeDeliveryThreshold - bill.itemTotal;
+  return gap > 0 && gap <= 50 ? Math.ceil(gap) : null;
+}
+
 function readPaymentMethods(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
@@ -801,6 +1042,33 @@ function formatOrderConfirmation(
 
 function formatRupees(value: number | undefined): string {
   return value === undefined ? "not specified by docs" : `₹${value}`;
+}
+
+function mergeCartItems(
+  existingItems: StoredCartItem[],
+  additions: Array<{ requestedName: string; selectedSpinId: string; quantity: number }>,
+): Array<{ requestedName: string; spinId: string; quantity: number }> {
+  const merged = new Map<string, { requestedName: string; spinId: string; quantity: number }>();
+  for (const item of existingItems) {
+    merged.set(item.spinId, { requestedName: item.requestedName, spinId: item.spinId, quantity: item.quantity });
+  }
+  for (const item of additions) {
+    const existing = merged.get(item.selectedSpinId);
+    if (existing) {
+      existing.quantity += item.quantity;
+    } else {
+      merged.set(item.selectedSpinId, {
+        requestedName: item.requestedName,
+        spinId: item.selectedSpinId,
+        quantity: item.quantity,
+      });
+    }
+  }
+  return [...merged.values()];
+}
+
+function isExpired(expiresAt: string | null | undefined): boolean {
+  return Boolean(expiresAt && new Date(expiresAt).getTime() <= Date.now());
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

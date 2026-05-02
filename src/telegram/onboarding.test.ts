@@ -124,6 +124,21 @@ class InMemoryTelegramRepository implements TelegramOnboardingRepository {
 
   async replaceCartItems(_input: { cartSessionId: string; revision: number; items: CartItemInsert[] }): Promise<void> {}
 
+  async findCartItems(_input: { cartSessionId: string; revision: number }) {
+    return [];
+  }
+
+  async openCartUpsellWindow(_input: { cartSessionId: string; revision: number; expiresAt: Date }): Promise<void> {}
+
+  async moveCartToRevision(_input: {
+    cartSessionId: string;
+    expectedRevision: number;
+    nextRevision: number;
+    status: StoredCartSession["status"];
+  }): Promise<StoredCartSession | null> {
+    return null;
+  }
+
   async markCartApprovalPending(_input: { cartSessionId: string; revision: number; approvalMessageId?: string }): Promise<void> {}
 
   async findCartSession(_cartSessionId: string): Promise<StoredCartSession | null> {

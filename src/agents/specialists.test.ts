@@ -75,6 +75,7 @@ describe("OpenAISpecialistAgents", () => {
         targetTelegramUserId: "12345",
       },
       { items: [{ name: "rajma", quantity: 1, unit: "kg", confidence: 0.86 }], requiresClarification: false },
+      { items: [{ name: "dahi", quantity: 1, unit: "pack", confidence: 0.86 }], requiresClarification: false },
       {
         addressId: "addr_home",
         items: [{ requestedName: "rajma", searchQuery: "rajma", selectedSpinId: "spin_rajma_1kg", quantity: 1 }],
@@ -95,6 +96,9 @@ describe("OpenAISpecialistAgents", () => {
     await expect(agents.extractMissingItems({ text: "rajma nahi hai" })).resolves.toMatchObject({
       items: [{ name: "rajma" }],
     });
+    await expect(agents.extractCartAddition({ text: "dahi bhi add kar do" })).resolves.toMatchObject({
+      items: [{ name: "dahi" }],
+    });
     await expect(
       agents.planCart({
         addressId: "addr_home",
@@ -107,6 +111,7 @@ describe("OpenAISpecialistAgents", () => {
       "meal_request_agent",
       "cook_prompt_agent",
       "missing_items_agent",
+      "cart_addition_agent",
       "cart_planner_agent",
     ]);
   });

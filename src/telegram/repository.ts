@@ -60,6 +60,7 @@ export type StoredCartSession = {
   status: "building" | "upsell_open" | "approval_pending" | "approved" | "checked_out" | "expired" | "failed";
   revision: number;
   selectedAddressId: string | null;
+  expiresAt?: string | null;
 };
 
 export type CartItemInsert = {
@@ -69,6 +70,11 @@ export type CartItemInsert = {
   quantity: number;
   unit?: string;
   priceMinor?: number;
+};
+
+export type StoredCartItem = CartItemInsert & {
+  cartSessionId: string;
+  revision: number;
 };
 
 export type OrderInsert = {
@@ -111,6 +117,14 @@ export interface TelegramOnboardingRepository {
     selectedAddressId: string;
   }): Promise<StoredCartSession>;
   replaceCartItems(input: { cartSessionId: string; revision: number; items: CartItemInsert[] }): Promise<void>;
+  findCartItems(input: { cartSessionId: string; revision: number }): Promise<StoredCartItem[]>;
+  openCartUpsellWindow(input: { cartSessionId: string; revision: number; expiresAt: Date }): Promise<void>;
+  moveCartToRevision(input: {
+    cartSessionId: string;
+    expectedRevision: number;
+    nextRevision: number;
+    status: StoredCartSession["status"];
+  }): Promise<StoredCartSession | null>;
   markCartApprovalPending(input: { cartSessionId: string; revision: number; approvalMessageId?: string }): Promise<void>;
   findCartSession(cartSessionId: string): Promise<StoredCartSession | null>;
   findActiveCartSession(householdId: string): Promise<StoredCartSession | null>;

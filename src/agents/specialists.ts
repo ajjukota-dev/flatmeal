@@ -22,6 +22,7 @@ export type SpecialistAgentName =
   | "meal_request_agent"
   | "cook_prompt_agent"
   | "missing_items_agent"
+  | "cart_addition_agent"
   | "cart_planner_agent";
 
 export type AgentTraceContext = {
@@ -125,6 +126,11 @@ export class OpenAISpecialistAgents {
     return missingItemsExtractionSchema.parse(output);
   }
 
+  async extractCartAddition(input: MissingItemsInput, trace: AgentTraceContext = {}): Promise<MissingItemsExtraction> {
+    const output = await this.runAgent("cart_addition_agent", input, trace);
+    return missingItemsExtractionSchema.parse(output);
+  }
+
   async planCart(input: CartPlannerInput, trace: AgentTraceContext = {}): Promise<CartBuildPlan> {
     const output = await this.runAgent("cart_planner_agent", input, trace);
     return cartBuildPlanSchema.parse(output);
@@ -178,6 +184,17 @@ function createSpecialistAgents(model?: string): Record<SpecialistAgentName, Any
         "Extract missing grocery items from a cook reply or restock request.",
         "Include quantity and unit only when present or clearly implied; ask for clarification when the message is too ambiguous.",
         "Do not call tools and do not build a cart.",
+      ].join(" "),
+      tools: [],
+      outputType: missingItemsExtractionSchema,
+    }),
+    cart_addition_agent: new Agent({
+      ...base,
+      name: "cart_addition_agent",
+      instructions: [
+        "Extract grocery additions from a flatmate or owner message during Flatmeal's active add-more window.",
+        "Return only grocery items, quantities, units, and confidence. Return no items for ordinary group chat.",
+        "Do not call Swiggy, Telegram, checkout, or order tools.",
       ].join(" "),
       tools: [],
       outputType: missingItemsExtractionSchema,

@@ -4,9 +4,9 @@ Persistent progress tracker for coding agents. Update this file after every mean
 
 ## Current Milestone
 
-- **Current:** M6 — Cart build, add-more window, approval revisioning, checkout simulation.
-- **Status:** In progress.
-- **Goal:** Build carts from extracted missing items through the local Instamart MCP stub, present revisioned Telegram cart approval, and simulate checkout only after latest explicit owner/flatmate approval.
+- **Current:** M7 — Observability, `agent_events`, traces, eval fixtures, demo script.
+- **Status:** Ready to start.
+- **Goal:** Add product-visible agent events, trace correlation, focused eval fixtures, and a repeatable demo script/checklist for the Telegram-first flow.
 
 ## Build Order
 
@@ -54,20 +54,27 @@ Persistent progress tracker for coding agents. Update this file after every mean
   - Added Sarvam STT/TTS providers and Telegram voice download/send primitives.
   - Added pre-M6 smoke verification for local agent/tool trajectory and gated live provider checks.
   - Wired Telegram text/voice messages into backend-owned M5 workflow with `voice_assets` STT persistence, `agent_runs` persistence, cook prompt text delivery, and Sarvam-generated cook voice notes.
+- **M6 — Cart build, add-more window, approval revisioning, checkout simulation.**
+  - Rechecked live Swiggy docs for cart build, add-more, approval, checkout, and tracking tool flows before implementation.
+  - Added cook missing-items/restock cart build through the local Instamart MCP stub using documented `get_addresses`, `search_products`, `update_cart`, and `get_cart` flow.
+  - Added one timed add-more/free-delivery window, flatmate/owner cart additions, full-cart replacement, revision increment, and revisioned Telegram approval cards.
+  - Added latest-approval checkout gates, stale approval rejection, duplicate checkout prevention, order persistence, and initial `track_order`.
+  - Added deterministic `smoke:m6` for cook restock → add-more → flatmate addition → approval → checkout.
 
 ## In Progress
 
-- M6 is in progress:
-  - Implemented cook missing-items → local Instamart cart build → Supabase cart session/items → revisioned Telegram approval card.
-  - Implemented approval callbacks containing `cartSessionId` and `revision`, stale approval rejection, owner/flatmate approval checks, latest `get_cart` re-read, guarded checkout, order persistence, and initial `track_order`.
-  - Supabase remains authoritative for cart truth, approval state, OAuth state, selected address, and order state.
-  - Remaining M6 work: timed add-more/free-delivery window and cart-addition revision rebuild.
+- M7 is ready to start:
+  - Add sanitized `agent_events` for user-visible workflow timeline.
+  - Correlate message, agent run, cart session, revision, MCP session/tool, and order events.
+  - Add eval fixtures for multilingual extraction, cart safety, stale approval, duplicate checkout, and Swiggy error branches.
+  - Prepare repeatable end-to-end demo checklist/script.
 
 ## Next Tasks
 
-1. Implement timed add-more/free-delivery window with `upsell_open` state, flatmate/owner addition handling, full-cart replacement, and revision increment.
-2. Add M6 smoke script for cook restock → approval card → approval callback → checkout simulation.
-3. Verify with focused cart/approval tests, Instamart trajectory tests, `npm run smoke:m5`, `npm run typecheck`, `npm test`, `npm run build`, and `git diff --check`.
+1. Add `agent_events` writes for message intake, transcription, intent, cart build, upsell, approval, checkout, and order tracking.
+2. Add trace/event correlation IDs across `agent_runs`, `cart_sessions`, `orders`, Telegram messages, and Instamart tool calls.
+3. Add eval fixtures for intent/extraction, cart planner, stale approval, duplicate checkout, and Swiggy error branches.
+4. Add a demo checklist/script covering group onboarding, fake Swiggy connect, voice request, cook reply, add-more, approval, and checkout.
 
 ## Blockers
 
@@ -107,6 +114,8 @@ Persistent progress tracker for coding agents. Update this file after every mean
 - 2026-05-02: Verified Telegram group webhook intake for supergroup `-1003918202790` (`Pegasus Food`) with the dev server and public tunnel running. Supabase `message_events` contains fresh text and voice rows for the supergroup. Voice stopped at intake because group roles are not selected yet, which is expected before the M6 workflow demo.
 - 2026-05-02: Started M6 by re-reading local product, agent architecture, Swiggy observability, Swiggy contract, and milestone docs. Re-fetched live Swiggy docs for `get_addresses`, `search_products`, `update_cart`, `get_cart`, `checkout`, `get_orders`, `track_order`, auth, delegated auth, errors, and the order-groceries recipe into `/private/tmp/flatmeal-swiggy-docs-m6`. Confirmed M6 must preserve `get_addresses → search_products → update_cart → get_cart → checkout → track_order`, variant `spinId`, full-cart replacement, payment-method display from `get_cart`, explicit approval before `checkout`, `get_orders` check before retry after uncertain checkout, and 10s minimum `track_order` polling.
 - 2026-05-02: Implemented M6 core cart/approval/checkout path. Added revisioned cart approval callback data, Telegram approval card sending, Supabase cart/session/order repository methods, cook missing-items cart build through `get_addresses`, `search_products`, `update_cart`, and `get_cart`, persisted cart items from local cart truth, stale approval rejection, owner/flatmate approval checks, checkout `get_cart` re-read, guarded `checkout`, order persistence, and initial `track_order`. Verified with `npm test -- src/telegram/callback-data.test.ts src/telegram/bot-api.test.ts src/telegram/message-workflow.test.ts src/telegram/onboarding.test.ts`, `npm run typecheck`, `npm test` (12 files / 50 tests), `npm run build`, `npm run smoke:m5` with escalation for tsx IPC, and `git diff --check`. Remaining M6 work is the timed add-more/free-delivery window and cart-addition revision rebuild.
+- 2026-05-02: Resumed remaining M6 work by re-reading local MVP, agent architecture, Swiggy contract, and milestone docs. Re-fetched live Swiggy docs for `search_products`, `update_cart`, `get_cart`, errors, and the order-groceries recipe into `/private/tmp/flatmeal-swiggy-docs-m6-remaining`. Confirmed add-more must still search before adding, use variant `spinId`, rebuild the full cart through replacement `update_cart`, then call `get_cart` before showing the next approval revision.
+- 2026-05-02: Completed remaining M6 add-more flow. Added `cart_addition_agent`, `upsell_open` handling, 2-minute add-more expiry state, flatmate/owner addition extraction, full-cart replacement using persisted cart truth plus new `spinId` selections, revision increment, new approval card, and lazy timeout finalization to approval. Added `npm run smoke:m6` for cook restock → add-more → flatmate addition → revisioned approval → guarded checkout. Verified with `npm test -- src/agents/specialists.test.ts src/telegram/message-workflow.test.ts src/telegram/onboarding.test.ts`, `npm run typecheck`, `npm test` (12 files / 51 tests), `npm run build`, `npm run smoke:m6` with escalation for tsx IPC, `npm run smoke:m5` with escalation for tsx IPC, and `git diff --check`. Supabase MCP live schema verification was attempted but blocked by MCP auth required; no schema migration was added in this slice.
 
 ## Commit / Push History
 

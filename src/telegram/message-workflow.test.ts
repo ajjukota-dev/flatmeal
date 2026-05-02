@@ -193,6 +193,36 @@ class FakeRepository implements TelegramOnboardingRepository {
     this.cartItems.push(...input.items.map((item) => ({ ...item, cartSessionId: input.cartSessionId, revision: input.revision })));
   }
 
+  async findCartItems(input: { cartSessionId: string; revision: number }) {
+    return this.cartItems.filter((item) => item.cartSessionId === input.cartSessionId && item.revision === input.revision);
+  }
+
+  async openCartUpsellWindow(input: { cartSessionId: string; revision: number; expiresAt: Date }): Promise<void> {
+    const session = this.cartSessions.find((candidate) => candidate.id === input.cartSessionId && candidate.revision === input.revision);
+    if (session) {
+      session.status = "upsell_open";
+      session.expiresAt = input.expiresAt.toISOString();
+    }
+  }
+
+  async moveCartToRevision(input: {
+    cartSessionId: string;
+    expectedRevision: number;
+    nextRevision: number;
+    status: StoredCartSession["status"];
+  }): Promise<StoredCartSession | null> {
+    const session = this.cartSessions.find(
+      (candidate) => candidate.id === input.cartSessionId && candidate.revision === input.expectedRevision,
+    );
+    if (!session) {
+      return null;
+    }
+    session.revision = input.nextRevision;
+    session.status = input.status;
+    session.expiresAt = null;
+    return session;
+  }
+
   async markCartApprovalPending(input: { cartSessionId: string; revision: number }): Promise<void> {
     const session = this.cartSessions.find((candidate) => candidate.id === input.cartSessionId && candidate.revision === input.revision);
     if (session) {
@@ -419,6 +449,96 @@ describe("TelegramMessageWorkflowService", () => {
     expect(repository.agentRuns.map((run) => run.agentName)).toEqual([
       "message_intent_agent",
       "missing_items_agent",
+      "cart_planner_agent",
+    ]);
+  });
+
+  it("opens one add-more window and rebuilds a full replacement cart at the next revision", async () => {
+    const repository = new FakeRepository();
+    const encryptionSecret = "m6-secret";
+    repository.swiggyConnection = {
+      id: "swiggy-connection-1",
+      encryptedAccessToken: encryptSecret("fake-swiggy-token", encryptionSecret),
+    };
+    const speech = new FakeSpeechProvider();
+    const runner = new FakeRunner([
+      {
+        intent: "cook_restock_request",
+        confidence: 0.91,
+        language: "hinglish",
+        reason: "Cook reported missing grocery.",
+        requiresClarification: false,
+      },
+      { items: [{ name: "chicken", quantity: 1, unit: "pack", confidence: 0.9 }], requiresClarification: false },
+      {
+        addressId: "addr_home",
+        items: [{ requestedName: "chicken", searchQuery: "chicken", selectedSpinId: "spin_chicken_500g", quantity: 1 }],
+      },
+      {
+        intent: "flatmate_cart_addition",
+        confidence: 0.95,
+        language: "hinglish",
+        reason: "Flatmate added one more grocery during add-more window.",
+        requiresClarification: false,
+      },
+      { items: [{ name: "milk", quantity: 1, unit: "l", confidence: 0.9 }], requiresClarification: false },
+      {
+        addressId: "addr_home",
+        items: [{ requestedName: "milk", searchQuery: "milk", selectedSpinId: "spin_milk_1l", quantity: 1 }],
+      },
+    ]);
+    const workflow = new TelegramMessageWorkflowService(
+      repository,
+      new OpenAISpecialistAgents({ runner }),
+      speech,
+      speech,
+      new FakeVoiceDownloader(),
+      { instamartClient: new LocalInstamartMcpStub(), encryptionSecret },
+    );
+
+    const firstActions = await workflow.handleMessage({
+      chat,
+      member: { id: "member-cook", householdId: "household-1", telegramUserId: "user-cook", role: "cook" },
+      messageEventId: "message-event-4",
+      message: textMessage("chicken nahi hai"),
+    });
+
+    expect(firstActions).toEqual([
+      {
+        type: "send_text_message",
+        chatId: "-100",
+        text: "₹20 more for free delivery — kuch aur chahiye? 2 min.",
+      },
+    ]);
+    expect(repository.cartSessions[0]).toMatchObject({ status: "upsell_open", revision: 1 });
+
+    const secondActions = await workflow.handleMessage({
+      chat,
+      member: { id: "member-flatmate", householdId: "household-1", telegramUserId: "user-flatmate", role: "flatmate" },
+      messageEventId: "message-event-5",
+      message: textMessage("milk bhi add kar do"),
+    });
+
+    expect(secondActions).toEqual([
+      expect.objectContaining({
+        type: "send_cart_approval_card",
+        chatId: "-100",
+        cartSessionId: "cart-1",
+        revision: 2,
+        text: expect.stringContaining("Instamart cart revision 2"),
+      }),
+    ]);
+    expect(repository.cartSessions[0]).toMatchObject({ status: "approval_pending", revision: 2, expiresAt: null });
+    expect(repository.cartItems.filter((item) => item.revision === 2)).toEqual([
+      expect.objectContaining({ spinId: "spin_chicken_500g", quantity: 1 }),
+      expect.objectContaining({ spinId: "spin_milk_1l", quantity: 1 }),
+    ]);
+    expect(repository.agentRuns.map((run) => run.agentName)).toEqual([
+      "message_intent_agent",
+      "missing_items_agent",
+      "cart_planner_agent",
+      "message_intent_agent",
+      "cart_addition_agent",
       "cart_planner_agent",
     ]);
   });

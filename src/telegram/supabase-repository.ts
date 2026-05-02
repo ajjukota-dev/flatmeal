@@ -5,6 +5,7 @@ import type {
   MessageEventInsert,
   OrderInsert,
   StoredCartSession,
+  StoredCartItem,
   StoredHouseholdChat,
   StoredCookMember,
   StoredHouseholdMember,
@@ -361,7 +362,7 @@ export class SupabaseTelegramRepository implements TelegramOnboardingRepository 
         status: "building",
         revision: 1,
       })
-      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id")
+      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id, expires_at")
       .single();
 
     if (result.error) {
@@ -404,6 +405,73 @@ export class SupabaseTelegramRepository implements TelegramOnboardingRepository 
     }
   }
 
+  async findCartItems(input: { cartSessionId: string; revision: number }): Promise<StoredCartItem[]> {
+    const result = await this.supabase
+      .from("cart_items")
+      .select("cart_session_id, revision, requested_name, selected_product_name, spin_id, quantity, unit, price_minor")
+      .eq("cart_session_id", input.cartSessionId)
+      .eq("revision", input.revision);
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    return result.data.map((row) => ({
+      cartSessionId: row.cart_session_id,
+      revision: row.revision,
+      requestedName: row.requested_name,
+      selectedProductName: row.selected_product_name ?? undefined,
+      spinId: row.spin_id,
+      quantity: row.quantity,
+      unit: row.unit ?? undefined,
+      priceMinor: row.price_minor ?? undefined,
+    }));
+  }
+
+  async openCartUpsellWindow(input: { cartSessionId: string; revision: number; expiresAt: Date }): Promise<void> {
+    const result = await this.supabase
+      .from("cart_sessions")
+      .update({
+        status: "upsell_open",
+        upsell_opened_at: new Date().toISOString(),
+        expires_at: input.expiresAt.toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.cartSessionId)
+      .eq("revision", input.revision)
+      .eq("status", "building");
+
+    if (result.error) {
+      throw result.error;
+    }
+  }
+
+  async moveCartToRevision(input: {
+    cartSessionId: string;
+    expectedRevision: number;
+    nextRevision: number;
+    status: StoredCartSession["status"];
+  }): Promise<StoredCartSession | null> {
+    const result = await this.supabase
+      .from("cart_sessions")
+      .update({
+        revision: input.nextRevision,
+        status: input.status,
+        expires_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.cartSessionId)
+      .eq("revision", input.expectedRevision)
+      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id, expires_at")
+      .maybeSingle();
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    return result.data ? toStoredCartSession(result.data) : null;
+  }
+
   async markCartApprovalPending(input: { cartSessionId: string; revision: number; approvalMessageId?: string }): Promise<void> {
     const result = await this.supabase
       .from("cart_sessions")
@@ -423,7 +491,7 @@ export class SupabaseTelegramRepository implements TelegramOnboardingRepository 
   async findCartSession(cartSessionId: string): Promise<StoredCartSession | null> {
     const result = await this.supabase
       .from("cart_sessions")
-      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id")
+      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id, expires_at")
       .eq("id", cartSessionId)
       .maybeSingle();
 
@@ -437,7 +505,7 @@ export class SupabaseTelegramRepository implements TelegramOnboardingRepository 
   async findActiveCartSession(householdId: string): Promise<StoredCartSession | null> {
     const result = await this.supabase
       .from("cart_sessions")
-      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id")
+      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id, expires_at")
       .eq("household_id", householdId)
       .in("status", ["building", "upsell_open", "approval_pending"])
       .order("created_at", { ascending: false })
@@ -464,7 +532,7 @@ export class SupabaseTelegramRepository implements TelegramOnboardingRepository 
       .eq("id", input.cartSessionId)
       .eq("revision", input.revision)
       .eq("status", "approval_pending")
-      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id")
+      .select("id, household_id, swiggy_connection_id, status, revision, selected_address_id, expires_at")
       .maybeSingle();
 
     if (result.error) {
@@ -530,6 +598,7 @@ function toStoredCartSession(row: {
   status: StoredCartSession["status"];
   revision: number;
   selected_address_id: string | null;
+  expires_at?: string | null;
 }): StoredCartSession {
   return {
     id: row.id,
@@ -538,5 +607,6 @@ function toStoredCartSession(row: {
     status: row.status,
     revision: row.revision,
     selectedAddressId: row.selected_address_id,
+    expiresAt: row.expires_at,
   };
 }
